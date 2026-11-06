@@ -1,4 +1,8 @@
-# Missao 01 - A busca pelo gerente
+# Missão 01 — A busca pelo gerente
+
+[Documentação](README.md) · [Roteiro de testes](TESTES.md) · [Roadmap](ROADMAP.md)
+
+**Estado:** implementada e verificada no Unity; APK desta missão e teste no Quest ainda pendentes.
 
 ## Abrir e testar
 No Unity, pare o Play e escolha **Sebrae Lab > Missao 01 > 2 - Abrir missao do gerente**.

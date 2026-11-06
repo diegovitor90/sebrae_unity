@@ -1,5 +1,7 @@
 # Como versionar este projeto no GitHub
 
+[Documentação](README.md) · [Como contribuir](../CONTRIBUTING.md)
+
 ## 1. O que cada nome significa
 
 | Termo | Significado neste projeto |
