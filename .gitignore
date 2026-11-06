@@ -1,0 +1,43 @@
+# Pastas geradas pelo Unity
+[Ll]ibrary/
+[Tt]emp/
+[Oo]bj/
+[Ll]ogs/
+[Uu]ser[Ss]ettings/
+[Bb]uilds/
+.utmp/
+[Mm]emoryCaptures/
+[Rr]ecordings/
+
+# Arquivos do editor e IDE
+.vs/
+.vscode/
+.idea/
+*.csproj
+*.sln
+*.slnx
+*.user
+*.pidb
+*.booproj
+*.svd
+*.opendb
+*.VC.db
+*.log
+.DS_Store
+Thumbs.db
+
+# Artefatos locais de preparacao e instaladores
+vr-*.txt
+*.apk
+*.aab
+
+# Credenciais e chaves de assinatura
+.env
+.env.*
+!.env.example
+*.keystore
+*.jks
+*.pfx
+
+# Copias locais de cenas abertas antes da edicao
+Local_Backup_*.unity*
