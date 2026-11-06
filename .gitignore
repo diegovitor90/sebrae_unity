@@ -38,3 +38,6 @@ vr-*.txt
 *.keystore
 *.jks
 *.pfx
+
+# Copias locais de cenas abertas antes da edicao
+Local_Backup_*.unity*

@@ -6,8 +6,8 @@ EditorBuildSettings:
   serializedVersion: 2
   m_Scenes:
   - enabled: 1
-    path: Assets/SebraeLab/Scenes/SebraeLab_Exploracao.unity
-    guid: e58053e4b29bfe94fbe090efd75b494b
+    path: Assets/SebraeLab/Scenes/SebraeLab_MissaoGerente.unity
+    guid: 80dbea794a0ef7947a5e868f236202b7
   m_configObjects:
     com.unity.xr.management.loader_settings: {fileID: 11400000, guid: bbf90c0bec8c8e74bab4f7f3b792daeb, type: 2}
     com.unity.xr.openxr.settings4: {fileID: 11400000, guid: d6269fb554ca3cb4ea11a754503dcbdb, type: 2}

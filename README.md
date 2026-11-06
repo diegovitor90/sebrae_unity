@@ -9,6 +9,14 @@ Clone o repositorio e adicione a pasta que contem Assets, Packages e ProjectSett
 Cena principal: `Assets/SebraeLab/Scenes/SebraeLab_Exploracao.unity`.
 Cena de testes anterior: `Assets/SebraeLab/Scenes/VR_Test.unity`.
 
+## Primeira missao: buscar o gerente
+Cena: `Assets/SebraeLab/Scenes/SebraeLab_MissaoGerente.unity`.
+Abrir pelo menu **Sebrae Lab > Missao 01 > 2 - Abrir missao do gerente**.
+Inclui NPC estilizado, conversa por texto, aceite, percurso sinalizado, chegada a sala, conclusao e reinicio.
+As verificacoes de fluxo em Play Mode passaram; a compilacao do novo APK e o teste desta missao no Quest ainda estao pendentes.
+Os APKs anteriores continuam sendo versoes da sala de testes e do ambiente sem esta missao.
+Instrucoes completas em [docs/MISSAO_GERENTE.md](docs/MISSAO_GERENTE.md).
+
 ## O que foi montado
 - 27 modelos FBX e 4 texturas originais importados com GUIDs preservados.
 - Layout montado a partir de Sebrae Lab.fbx, com mobiliario em objetos separados.
