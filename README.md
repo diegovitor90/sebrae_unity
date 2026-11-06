@@ -1,70 +1,115 @@
-# Sebrae Lab VR
+# Missão Estágio — Sebrae Lab VR
 
-Projeto Unity 6000.0.83f1 para Meta Quest 3 / 3S.
+Experiência em realidade virtual em que o visitante conhece o Sebrae Lab no papel de um estagiário em seu primeiro dia: explora o espaço, conversa com o gestor e recebe pequenas missões.
 
-## Abrir o ambiente
-Clone o repositorio e adicione a pasta que contem Assets, Packages e ProjectSettings no Unity Hub. Depois usar:
-**Sebrae Lab > Ambiente > 2 - Abrir ambiente**.
+**Em desenvolvimento:** ambiente 3D montado e primeira missão implementada no Unity. A validação no Quest real ainda não foi registrada. O APK da missão do gerente ainda não foi gerado.
 
-Cena principal: `Assets/SebraeLab/Scenes/SebraeLab_Exploracao.unity`.
-Cena de testes anterior: `Assets/SebraeLab/Scenes/VR_Test.unity`.
+![Prévia do ambiente](Previews/SebraeLab_Interior.png)
 
-## Primeira missao: buscar o gerente
-Cena: `Assets/SebraeLab/Scenes/SebraeLab_MissaoGerente.unity`.
-Abrir pelo menu **Sebrae Lab > Missao 01 > 2 - Abrir missao do gerente**.
-Inclui NPC estilizado, conversa por texto, aceite, percurso sinalizado, chegada a sala, conclusao e reinicio.
-As verificacoes de fluxo em Play Mode passaram; a compilacao do novo APK e o teste desta missao no Quest ainda estao pendentes.
-Os APKs anteriores continuam sendo versoes da sala de testes e do ambiente sem esta missao.
-Instrucoes completas em [docs/MISSAO_GERENTE.md](docs/MISSAO_GERENTE.md).
+## Comece por aqui
 
-## O que foi montado
-- 27 modelos FBX e 4 texturas originais importados com GUIDs preservados.
-- Layout montado a partir de Sebrae Lab.fbx, com mobiliario em objetos separados.
-- 24 elementos de exportacao/catalogo retirados da cena; arquivos originais preservados.
-- Escala original mantida: aproximadamente 1 unidade Unity por metro. Geladeira de referencia: 1,72 m.
-- Origem do ambiente centralizada em X. Jogador na recepcao, com rastreamento relativo ao piso.
-- Hierarquia: Arquitetura, Mobiliario, Decoracao e luminarias, Colisoes e navegacao.
-- Materiais de paredes, piso, madeira, metal, vidro e trim sheet; remapeados tambem nos modelos de origem.
-- Texturas Android em ASTC 6x6, com mipmaps; atlas 2048 e demais texturas ate 1024.
-- Iluminacao ambiente simples e luz direcional, sem sombras em tempo real.
-- Prefab reutilizavel: `Assets/SebraeLab/Environment/Prefabs/SebraeLab_Ambiente.prefab`.
+1. Instale **Unity 6000.0.83f1** pelo Unity Hub.
+2. Clone o repositório:
 
-## Colisoes e locomocao
-A base foi separada em dois colliders: estrutura e piso navegavel.
-O piso utiliza somente triangulos horizontais voltados para cima na altura zero (178 triangulos).
-Paredes, portas e mobiliario possuem colisao de malha estatica, preservando aberturas da geometria.
-O piso usa a interaction layer 31, Teleport, e o jogador utiliza teletransporte e giro de 45 graus.
-Os moveis ainda sao estaticos; tornar uma cadeira ou porta interativa exige configurar a fisica e a interacao especificas daquela missao.
+~~~bash
+git clone https://github.com/diegovitor90/sebrae_unity.git
+cd sebrae_unity
+~~~
 
-## Validacao
-- Cena de exploracao abriu em Play Mode com duas maos simuladas, sem excecoes de execucao nessa verificacao inicial.
-- APK do ambiente compilado com sucesso e assinatura verificada; 51.567.489 bytes, ARM64.
-- Previa interna e planta renderizadas e inspecionadas em `Previews/`.
-- Posicao inicial: sobre piso navegavel e sem obstaculos em uma capsula de raio 0,20 m.
-- Zero scripts ausentes e zero referencias de material vazias na cena.
-- Relatorio local: `Logs/environment-validation.json`.
-- Conforto, desempenho, escala percebida e trajetos completos precisam ser validados no Quest real.
+3. No Unity Hub, adicione a pasta que contém **Assets, Packages e ProjectSettings**. Aguarde a importação e a compilação.
+4. No menu superior do editor, abra **Sebrae Lab → Missao 01 → 2 - Abrir missao do gerente**.
+5. Para teclado e mouse, pare o Play, ative **Sebrae Lab → 4 - Alternar simulador PC** e clique em **▶ Play**.
 
-## Teste no computador
-Usar **Sebrae Lab > 4 - Alternar simulador PC**, depois Play.
-O simulador esta desativado por padrao e marcado EditorOnly, sendo excluido da build.
-Os controles sao os do XR Device Simulator nos Samples do XR Interaction Toolkit.
-Desativar o simulador antes de usar um headset conectado via PC.
+O menu **Sebrae Lab** fica na barra superior, junto de File, Edit e Window. Ele não é a pasta da janela Project.
 
-## APKs
-- Sala de testes anterior: `Builds/Quest/SebraeLabVR.apk`.
-- Ambiente: `Builds/Quest/SebraeLab-Ambiente.apk`, gerado pelo menu **Sebrae Lab > Ambiente > 5 - Gerar APK do ambiente**.
-- Ambos usam o identificador `com.sebraelab.missaoestagio`; instalar um substitui a versao do outro no headset.
+[Instalação e primeiros testes](docs/COMECE_AQUI.md) · [Índice da documentação](docs/README.md)
 
-## Ferramentas Android nesta maquina
-Android Build Support instalado no Unity.
-SDK (API 35 / build tools 36), NDK r27c e OpenJDK 17 extraidos em `../../work/android-toolchain`.
-O comando Preparar base VR usa esses caminhos quando existem; em outro computador, instalar as ferramentas e configurar External Tools.
-A pasta work e local e nao deve ser enviada ao repositorio.
+## O que já foi feito
 
-## Controle de versao
-Versionar Assets, Packages, ProjectSettings e arquivos .meta.
-Library, Temp, Logs, UserSettings e Builds ficam fora do Git.
-Repositorio compartilhado: https://github.com/diegovitor90/sebrae_unity
+| Entrega | Situação comprovada | Próxima validação |
+| --- | --- | --- |
+| Ambiente 3D | Modelos importados, mobiliário organizado, materiais/texturas aplicados, escala métrica preservada e colisões configuradas | Escala percebida, percursos e desempenho no Quest |
+| Base VR | Jogador, controles, teletransporte, giro em passos e simulador de PC configurados | Rastreamento e interação com controles reais |
+| Sala de testes | Cubo para pegar/soltar e botão com resposta visual | Operação no headset |
+| Gerente → conversa → encontrar a sala | NPC estilizado, diálogo, aceite, percurso sinalizado, conclusão e reinício | APK desta cena e teste no Quest |
+| Versionamento | Projeto completo integrado à main, com arquivos .meta e guias | Novas entregas por branch e pull request |
 
-Guia para aprender a versionar: [docs/VERSIONAMENTO.md](docs/VERSIONAMENTO.md).
+A missão passou por **11 verificações de fluxo em Play Mode**. Elas verificam a lógica e os callbacks dos botões; não substituem apontar, apertar o gatilho e se locomover com o Quest real.
+
+## Cenas
+
+| Cena | Finalidade | Menu para abrir |
+| --- | --- | --- |
+| SebraeLab_MissaoGerente.unity | Primeira missão: encontrar gestor, conversar e localizar a sala | Sebrae Lab → Missao 01 → 2 - Abrir missao do gerente |
+| SebraeLab_Exploracao.unity | Ambiente de exploração sem a missão | Sebrae Lab → Ambiente → 2 - Abrir ambiente |
+| VR_Test.unity | Testes isolados de objetos e interface | Sebrae Lab → 2 - Abrir cena de teste |
+
+Arquivos em [Assets/SebraeLab/Scenes](Assets/SebraeLab/Scenes). A cena da missão está selecionada nas configurações de build versionadas.
+
+## Missões do roteiro
+
+| Etapa | Estado atual |
+| --- | --- |
+| **1. Busca pelo gerente** — encontrar → conversar → receber missão | Implementada no Unity |
+| **2. A própria sala** — encontrar → agarrar maçaneta → abrir porta | Chegada e conclusão implementadas; maçaneta e abertura interativa pendentes |
+| **3. Mural do Conhecimento** — apontar → ler → “Entendido” | Pendente |
+| **4. Café de sobrevivência** — encontrar a copa → pegar café | Pendente; a copa pode ser reaproveitada |
+| **5. Faz-tudo** — guardar livros → endireitar cadeiras → posicionar notebooks → aviso final | Pendente; há modelos de cadeiras, mas falta a interação e a validação |
+
+Boliche e arco e flecha são atividades planejadas, ainda não implementadas. A equipe precisa definir se entram na entrega principal ou como extras.
+
+O status descreve entregas verificáveis, sem percentuais de esforço. [Backlog e critérios de conclusão](docs/ROADMAP.md).
+
+## APKs e distribuição
+
+| Arquivo | Conteúdo | Situação |
+| --- | --- | --- |
+| SebraeLabVR.apk | Sala de testes | Gerado localmente; assinatura verificada |
+| SebraeLab-Ambiente.apk | Ambiente de exploração | Gerado localmente; assinatura verificada |
+| SebraeLab-MissaoGerente.apk | Ambiente com a primeira missão | Ainda não gerado |
+
+**Os APKs não estão no repositório e ainda não há GitHub Release publicada.** As builds existentes ficaram na máquina de desenvolvimento, na pasta Builds/Quest/. Clonar o projeto não baixa um aplicativo pronto.
+
+Os APKs existentes foram produzidos antes da missão e não a incluem. Todas as builds usam **com.sebraelab.missaoestagio**: instalar uma versão substitui a anterior no dispositivo.
+
+[Como gerar e instalar a build correta](docs/COMECE_AQUI.md#gerar-o-apk-correto). Builds aprovadas poderão ser distribuídas por GitHub Releases.
+
+## Organização
+
+~~~text
+Assets/
+├── SebraeLab/       # Cenas, scripts, materiais, ambiente e missão
+├── Sebraelab3D/     # 27 modelos FBX e quatro texturas originais
+├── Samples/         # Exemplos do XR Interaction Toolkit
+├── XR/              # Configurações OpenXR
+└── XRI/             # Configurações de interação
+Packages/            # Dependências e versões fixadas
+ProjectSettings/     # Configurações e versão do Unity
+Previews/            # Imagens do ambiente para revisão
+docs/                # Guias, status e testes
+.github/             # Modelos de issue e pull request
+SebraeLabUnityAssets.unitypackage  # Pacote original preservado
+~~~
+
+[Arquitetura, prefabs, modelos e colisões](docs/ESTRUTURA.md). Caches, logs, preferências locais, ferramentas Android e builds ficam fora do Git.
+
+## Base técnica
+
+- **Unity 6000.0.83f1**, com alvo Meta Quest 3/3S.
+- **XR Interaction Toolkit 3.0.11**, **OpenXR 1.16.1** e **Input System 1.19.0**.
+- Android **ARM64 / IL2CPP**, Vulkan, API mínima **32** e alvo **35**.
+- Texturas Android ASTC 6×6 com mipmaps; atlas até 2048 e demais texturas até 1024.
+
+As dependências são controladas por [manifest.json](Packages/manifest.json) e [packages-lock.json](Packages/packages-lock.json). As ferramentas Android devem ser configuradas em cada computador.
+
+## Documentação e equipe
+
+- [Abrir e testar o projeto](docs/COMECE_AQUI.md)
+- [Verificações realizadas e roteiro de testes](docs/TESTES.md)
+- [Detalhes da primeira missão](docs/MISSAO_GERENTE.md)
+- [Roadmap e próximas entregas](docs/ROADMAP.md)
+- [Como contribuir](CONTRIBUTING.md)
+- [Aprender Git e GitHub](docs/VERSIONAMENTO.md)
+- [Papéis propostos para a equipe](docs/EQUIPE.md)
+
+Use as [Issues](https://github.com/diegovitor90/sebrae_unity/issues) para registrar falhas e tarefas. Informe sempre a cena e se o resultado foi verificado no editor ou no Quest.

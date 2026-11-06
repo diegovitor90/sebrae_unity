@@ -1,0 +1,33 @@
+name: Relatar problema
+description: Registrar uma falha reproduzível no projeto VR.
+title: "[Bug] "
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: O que aconteceu?
+    validations:
+      required: true
+  - type: input
+    id: environment
+    attributes:
+      label: Ambiente do teste
+      description: "Unity, cena, commit e simulador ou modelo do Quest."
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Passos para reproduzir
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Resultado esperado e observado
+    validations:
+      required: true
+  - type: textarea
+    id: evidence
+    attributes:
+      label: Evidências e erros relevantes

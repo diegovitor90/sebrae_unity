@@ -1,0 +1,35 @@
+name: Planejar entrega ou missão
+description: Definir escopo e critérios de aceite.
+title: "[Entrega] "
+body:
+  - type: textarea
+    id: objective
+    attributes:
+      label: Objetivo para o jogador
+    validations:
+      required: true
+  - type: textarea
+    id: scope
+    attributes:
+      label: Escopo e dependências
+      description: "Modelos, lógica, UI, cenas e tarefas anteriores."
+    validations:
+      required: true
+  - type: textarea
+    id: acceptance
+    attributes:
+      label: Critérios de aceite
+      description: "Comportamentos verificáveis, conclusão e reinício."
+    validations:
+      required: true
+  - type: textarea
+    id: testing
+    attributes:
+      label: Como testar
+      description: "Diferencie editor/simulador de Quest real."
+    validations:
+      required: true
+  - type: input
+    id: owner
+    attributes:
+      label: Responsável a confirmar com a equipe
