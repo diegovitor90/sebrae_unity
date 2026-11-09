@@ -33,7 +33,7 @@ Este repositorio guarda o projeto Unity na raiz:
 - Previews/: imagens para revisar o ambiente.
 - docs/: instrucoes da equipe.
 - README.md, .gitignore e .gitattributes.
-- SebraeLabUnityAssets.unitypackage: pacote original preservado do historico anterior.
+- Archives/SebraeLabUnityAssets.unitypackage: pacote original preservado do historico anterior.
 
 Library, Temp, Logs, UserSettings, Builds, SDK/NDK/JDK, APKs e chaves de assinatura nao entram no Git. O Unity recria seus caches. Builds podem ser distribuidas separadamente.
 

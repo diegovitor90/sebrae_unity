@@ -14,14 +14,18 @@ Um FBX é um modelo; a cena registra onde ele aparece e os componentes ligados a
 | Assets/SebraeLab/Missions/Manager/ | Materiais e prefab visual do gerente |
 | Assets/SebraeLab/Scripts/Missions/ | Lógica de execução da missão |
 | Assets/SebraeLab/Scripts/VRTestButton.cs | Botão da sala de testes |
-| Assets/SebraeLab/Editor/ | Ferramentas de montagem, verificação e build |
+| Assets/SebraeLab/Editor/Setup/ | Montagem do ambiente, configuração VR e build |
+| Assets/SebraeLab/Editor/Validation/ | Verificações das missões e do percurso |
+| Assets/SebraeLab/Editor/Tours/ | Demonstração das cinco missões |
+| Assets/SebraeLab/Art/Textures/Acabamentos/ | Imagens das superfícies dos objetos |
+| Assets/SebraeLab/Resources/Acabamentos/ | Materiais carregados pelas missões |
 | Assets/Samples/ | Recursos dos exemplos oficiais usados no jogador e no simulador |
 | Assets/XR/ e Assets/XRI/ | OpenXR e configurações de interação |
 | Packages/ | Dependências e lockfile |
 | ProjectSettings/ | Configurações compartilhadas |
 | Previews/ | Renderizações para revisar a montagem |
 
-O pacote .unitypackage na raiz preserva o material recebido. Não é preciso importá-lo novamente para abrir este projeto completo.
+O pacote .unitypackage em Archives/ preserva o material recebido. Não é preciso importá-lo novamente para abrir este projeto completo.
 
 ## Ambiente
 
