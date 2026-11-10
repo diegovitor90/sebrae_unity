@@ -36,14 +36,47 @@ namespace SebraeLab.Missions
         public int CompletionCount { get; private set; }
         float nextCheck;
 
-        void Start() { RestartMission(); }
+        public InternshipDay day { get; private set; }
+        void Start() {
+#if UNITY_EDITOR || UNITY_STANDALONE
+            gameObject.AddComponent<DesktopPlayer>().Initialize(this);
+#endif
+            day = gameObject.AddComponent<InternshipDay>(); day.Initialize(this); dialogue[dialogue.Length-1]="Seu escritório fica na galeria ao lado da praça. Siga as marcas até a porta da Sala 2. A sala de aula fica logo depois do escritório."; RestartMission(); }
         void Update()
         {
+#if UNITY_EDITOR || UNITY_STANDALONE
+            if (UnityEngine.InputSystem.Keyboard.current?.fKey.wasPressedThisFrame == true && !(TryGetComponent<DesktopPlayer>(out var pc) && pc.UseAimedStation()))
+                Interact();
+#endif
             if (Time.unscaledTime < nextCheck) return;
             nextCheck = Time.unscaledTime + .1f;
             EvaluatePlayer();
         }
 
+#if UNITY_EDITOR || UNITY_STANDALONE
+        void OnGUI()
+        {
+            if (!playerHead || !playerHead.TryGetComponent<Camera>(out var camera) || !camera.enabled) return;
+            if (State == ManagerMissionState.FindRoom || State == ManagerMissionState.Completed)
+            {
+                var hint=day.RoomHint();
+                if(hint!=null) GUI.Box(new Rect((Screen.width-340)/2,Screen.height-58,340,36),hint);
+                return;
+            }
+            float width = Mathf.Min(Screen.width - 20, 540);
+            var box = new Rect((Screen.width - width) / 2, Screen.height - 112, width, 100);
+            GUILayout.BeginArea(box, GUI.skin.box);
+            if (!CanConverse())
+                GUILayout.Label("Primeiro dia • Aproxime-se do gerente com W, A, S e D.");
+            else
+            {
+                GUILayout.Label(State == ManagerMissionState.Dialogue ? dialogue[DialogueIndex] : "Gestor do espaço");
+                if (GUILayout.Button("[F]  " + actionText.text, GUILayout.Height(32)))
+                    Interact();
+            }
+            GUILayout.EndArea();
+        }
+#endif
         public bool CanConverse()
         {
             if (!playerHead || !manager) return false;
@@ -73,6 +106,7 @@ namespace SebraeLab.Missions
         {
             if (State == ManagerMissionState.FindManager) TryBeginConversation();
             else if (State == ManagerMissionState.Dialogue) TryAdvanceDialogue();
+            else if(day) day.UseRoom();
         }
 
         public bool TryAdvanceDialogue()
@@ -90,7 +124,7 @@ namespace SebraeLab.Missions
 
         public void EvaluatePlayer()
         {
-            if (State == ManagerMissionState.FindRoom && playerHead && room && room.Contains(playerHead.position))
+            if (State == ManagerMissionState.FindRoom && playerHead && room && day && day.DoorOpen && room.Contains(playerHead.position))
             {
                 State = ManagerMissionState.Completed;
                 CompletionCount++;
@@ -119,7 +153,7 @@ namespace SebraeLab.Missions
         {
             if (routeMarkers) routeMarkers.SetActive(State == ManagerMissionState.FindRoom);
             if (roomMarker) roomMarker.SetActive(State == ManagerMissionState.FindRoom || State == ManagerMissionState.Completed);
-            if (completionPanel) completionPanel.SetActive(State == ManagerMissionState.Completed);
+            if (completionPanel) completionPanel.SetActive(false);
             if (conversationButton) conversationButton.gameObject.SetActive(State == ManagerMissionState.FindManager || State == ManagerMissionState.Dialogue);
             switch (State)
             {
@@ -135,11 +169,11 @@ namespace SebraeLab.Missions
                     break;
                 case ManagerMissionState.FindRoom:
                     if (objectiveText) objectiveText.text = "OBJETIVO | ENCONTRE SUA SALA";
-                    if (dialogueText) dialogueText.text = "Siga as marcações azuis pelo corredor. Entre na sala sinalizada para concluir sua primeira missão.";
+                    if (dialogueText) dialogueText.text = "Siga as marcações azuis pelo corredor. Segure a maçaneta amarela, abra a porta e entre na sala.";
                     break;
                 case ManagerMissionState.Completed:
                     if (objectiveText) objectiveText.text = "MISSÃO CONCLUÍDA";
-                    if (dialogueText) dialogueText.text = "Você encontrou sua sala. Bem-vindo ao Sebrae Lab!";
+                    if (dialogueText) dialogueText.text = "Atravesse o escritório e siga a placa Sala de aula até o mural.";
                     break;
             }
         }

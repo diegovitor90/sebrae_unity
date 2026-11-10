@@ -209,12 +209,15 @@ namespace SebraeLab.Editor
         [MenuItem("Sebrae Lab/Missao 01/2 - Abrir missao do gerente")]
         public static void Open() { EditorSceneManager.OpenScene(MissionScene); }
 
-        [MenuItem("Sebrae Lab/Missao 01/3 - Gerar APK da missao")]
+        [MenuItem("Sebrae Lab/Entrega/Gerar APK do expediente completo")]
         public static void Build()
         {
-            VRProjectSetup.Setup(); Open();
+            Open();
+            EditorBuildSettings.scenes = new[] { new EditorBuildSettingsScene(MissionScene, true) };
+            if (!BuildPipeline.IsBuildTargetSupported(BuildTargetGroup.Android, BuildTarget.Android))
+                throw new InvalidOperationException("Instale Android Build Support para esta versão do editor.");
             Directory.CreateDirectory("Builds/Quest");
-            var report = BuildPipeline.BuildPlayer(new[] { MissionScene }, "Builds/Quest/SebraeLab-MissaoGerente.apk", BuildTarget.Android, BuildOptions.Development);
+            var report = BuildPipeline.BuildPlayer(new[] { MissionScene }, "Builds/Quest/MissaoEstagio.apk", BuildTarget.Android, BuildOptions.Development);
             if (report.summary.result != UnityEditor.Build.Reporting.BuildResult.Succeeded) throw new Exception("Falha na build da missão: " + report.summary.result);
         }
     }

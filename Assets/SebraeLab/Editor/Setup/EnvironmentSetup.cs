@@ -27,7 +27,7 @@ namespace SebraeLab.Editor {
   static void Materials(){
    mats=new Dictionary<string,Material>();
    mats["CombinedTexture"]=Material("TrimSheet","TrimSheet_2k_albedo",Color.white);
-   mats["Parede"]=Material("Paredes","PlasterWall_1k_albedo",Color.white);
+   mats["Parede"]=Material("Paredes","PlasterWall_1k_albedo",new Color(.63f,.70f,.66f));
    mats["Chao Azulejo"]=Material("Piso_Azulejo","TileFloor_1k_albedo",Color.white);
    mats["Chao Madeira"]=Material("Piso_Madeira","WoodFloor_1k_albedo",Color.white);
    mats["Calçada"]=Material("Calcada",null,new Color(.5f,.52f,.54f));
