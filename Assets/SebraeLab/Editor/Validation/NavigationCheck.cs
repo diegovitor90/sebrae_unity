@@ -90,55 +90,87 @@ namespace SebraeLab.Editor
             r.Texto.AppendLine("Navegação, tetos e luzes • " + DateTime.Now);
             yield return null;
 
-            Locomocao(r);
-            Iluminacao(r);
-            Tetos(r);
+            Secao(r, "Locomoção", Locomocao);
+            Secao(r, "Iluminação", Iluminacao);
+            Secao(r, "Tetos", Tetos);
 
             r.Secao("Rota");
-            var rig = Object.FindObjectsByType<CharacterController>(FindObjectsInactive.Include, FindObjectsSortMode.None)
-                .FirstOrDefault(c => c.gameObject.name == "Jogador VR - Recepcao");
-            if (!rig) r.Falha("CharacterController do rig 'Jogador VR - Recepcao' não encontrado");
-            else
-            {
-                var pc = mission.playerRoot ? mission.playerRoot.GetComponent<CharacterController>() : null;
-                if (pc && pc != rig) pc.enabled = false; // o corpo do modo PC não pode bloquear o teste
-
-                var porta = Object.FindFirstObjectByType<HandDoor>();
-                if (porta && !porta.IsOpen) { porta.Toggle(); yield return new WaitForSeconds(1f); }
-                var portao = GameObject.Find("Porta da descompressão");
-                if (portao) { portao.SetActive(false); r.Info("Porta da descompressão aberta para o teste"); }
-
-                var corpo = new GameObject("Corpo de teste (rig VR)").AddComponent<CharacterController>();
-                corpo.height = rig.height; corpo.radius = rig.radius; corpo.center = rig.center;
-                corpo.stepOffset = rig.stepOffset; corpo.slopeLimit = rig.slopeLimit; corpo.skinWidth = rig.skinWidth;
-                corpo.transform.position = Rota[0];
-                r.Info($"Corpo: raio {corpo.radius:0.##} m, altura {corpo.height:0.##} m, degrau {corpo.stepOffset:0.##} m, inclinação {corpo.slopeLimit:0}°");
-                Physics.SyncTransforms();
-
-                var estado = new Caminhada();
-                for (int i = 1; i < Rota.Length && estado.Erro == null; i++)
-                {
-                    yield return Andar(corpo, Rota[i], estado);
-                    if (estado.Erro == null) r.Ok($"trecho {i}: chegou a {Fmt(Rota[i])}");
-                }
-                if (estado.Erro != null) r.Falha("rota: " + estado.Erro);
-                r.Info($"Maior subida em um passo: {estado.MaiorSubida:0.###} m, em {Fmt(estado.OndeSubiu)}");
-                Object.Destroy(corpo.gameObject);
-            }
+            yield return Seguro(Percurso(mission, r), r, "rota");
 
             r.Secao("Custo por ambiente (editor, referência)");
-            yield return Custo(mission, r);
+            yield return Seguro(Custo(mission, r), r, "custo por ambiente");
 
             r.Texto.AppendLine().AppendLine(r.Falhas == 0 ? "RESULTADO: OK" : $"RESULTADO: FALHA ({r.Falhas})");
-            Directory.CreateDirectory("Logs");
-            File.WriteAllText(Report, r.Texto.ToString());
-            Debug.Log("NavigationCheck\n" + r.Texto);
-            if (SessionState.GetBool(ExitKey, false)) EditorApplication.Exit(r.Falhas == 0 ? 0 : 1);
+            try
+            {
+                Directory.CreateDirectory("Logs");
+                File.WriteAllText(Report, r.Texto.ToString());
+                Debug.Log("NavigationCheck\n" + r.Texto);
+            }
+            finally
+            {
+                if (SessionState.GetBool(ExitKey, false)) EditorApplication.Exit(r.Falhas == 0 ? 0 : 1);
+            }
+        }
+
+        static void Secao(Relatorio r, string nome, Action<Relatorio> corpo)
+        {
+            r.Secao(nome);
+            try { corpo(r); }
+            catch (Exception e) { r.Falha($"erro em {nome}: {e.GetType().Name}: {e.Message}"); }
+        }
+
+        /// <summary>Anda o iterador por dentro de try/catch (yield não é permitido em try com catch); exceção vira falha.</summary>
+        static IEnumerator Seguro(IEnumerator inner, Relatorio r, string nome)
+        {
+            while (true)
+            {
+                object atual;
+                try
+                {
+                    if (!inner.MoveNext()) yield break;
+                    atual = inner.Current;
+                }
+                catch (Exception e) { r.Falha($"erro em {nome}: {e.GetType().Name}: {e.Message}"); yield break; }
+                if (atual is IEnumerator aninhado) yield return Seguro(aninhado, r, nome);
+                else yield return atual;
+            }
+        }
+
+        static IEnumerator Percurso(ManagerMission mission, Relatorio r)
+        {
+            var rig = Object.FindObjectsByType<CharacterController>(FindObjectsInactive.Include, FindObjectsSortMode.None)
+                .FirstOrDefault(c => c.gameObject.name == "Jogador VR - Recepcao");
+            if (!rig) { r.Falha("CharacterController do rig 'Jogador VR - Recepcao' não encontrado"); yield break; }
+
+            var pc = mission.playerRoot ? mission.playerRoot.GetComponent<CharacterController>() : null;
+            if (pc && pc != rig) pc.enabled = false; // o corpo do modo PC não pode bloquear o teste
+
+            var porta = Object.FindFirstObjectByType<HandDoor>();
+            if (porta && !porta.IsOpen) { porta.Toggle(); yield return new WaitForSeconds(1f); }
+            var portao = GameObject.Find("Porta da descompressão");
+            if (portao) { portao.SetActive(false); r.Info("Porta da descompressão aberta para o teste"); }
+
+            var corpo = new GameObject("Corpo de teste (rig VR)").AddComponent<CharacterController>();
+            corpo.height = rig.height; corpo.radius = rig.radius; corpo.center = rig.center;
+            corpo.stepOffset = rig.stepOffset; corpo.slopeLimit = rig.slopeLimit; corpo.skinWidth = rig.skinWidth;
+            corpo.transform.position = Rota[0];
+            r.Info($"Corpo: raio {corpo.radius:0.##} m, altura {corpo.height:0.##} m, degrau {corpo.stepOffset:0.##} m, inclinação {corpo.slopeLimit:0}°");
+            Physics.SyncTransforms();
+
+            var estado = new Caminhada();
+            for (int i = 1; i < Rota.Length && estado.Erro == null; i++)
+            {
+                yield return Andar(corpo, Rota[i], estado);
+                if (estado.Erro == null) r.Ok($"trecho {i}: chegou a {Fmt(Rota[i])}");
+            }
+            if (estado.Erro != null) r.Falha("rota: " + estado.Erro);
+            r.Info($"Maior subida em um passo: {estado.MaiorSubida:0.###} m, em {Fmt(estado.OndeSubiu)}");
+            Object.Destroy(corpo.gameObject);
         }
 
         static void Locomocao(Relatorio r)
         {
-            r.Secao("Locomoção");
             var esquerdo = Object.FindObjectsByType<ControllerInputActionManager>(FindObjectsInactive.Include, FindObjectsSortMode.None)
                 .FirstOrDefault(c => c.gameObject.name == "Left Controller");
             if (!esquerdo) r.Falha("ControllerInputActionManager do Left Controller não encontrado");
@@ -148,7 +180,6 @@ namespace SebraeLab.Editor
 
         static void Iluminacao(Relatorio r)
         {
-            r.Secao("Iluminação");
             var luzes = Object.FindObjectsByType<Light>(FindObjectsSortMode.None);
             var direcionais = luzes.Where(l => l.type == LightType.Directional).ToArray();
             if (direcionais.Length == 1 && direcionais[0].renderMode == LightRenderMode.ForcePixel && direcionais[0].shadows == LightShadows.None)
@@ -191,13 +222,27 @@ namespace SebraeLab.Editor
 
         static void Tetos(Relatorio r)
         {
-            r.Secao("Tetos");
+            var antes = Physics.queriesHitBackfaces;
+            Physics.queriesHitBackfaces = true; // a parede norte tem pontos exatamente na linha do teto
+            try { SondarTetos(r); }
+            finally { Physics.queriesHitBackfaces = antes; }
+        }
+
+        static void SondarTetos(Relatorio r)
+        {
             var colisores = Object.FindObjectsByType<Collider>(FindObjectsSortMode.None);
             foreach (var nome in PisosCobertos)
             {
                 var pisos = colisores.Where(c => c.name == nome && !c.isTrigger).ToArray();
                 if (pisos.Length == 0) { r.Falha($"{nome}: piso não encontrado"); continue; }
-                int total = 0;
+                int total = 0, ignorados = 0;
+                Bounds? pegada = null;
+                if (nome == "Piso - Teletransporte")
+                {
+                    var teto = Object.FindObjectsByType<Renderer>(FindObjectsSortMode.None).FirstOrDefault(m => m.gameObject.name == "Teto");
+                    if (!teto) { r.Falha("Teto do prédio não encontrado"); continue; }
+                    pegada = teto.bounds;
+                }
                 var descobertos = new List<Vector3>();
                 foreach (var piso in pisos)
                 {
@@ -206,12 +251,15 @@ namespace SebraeLab.Editor
                     for (float z = b.min.z + .25f; z < b.max.z; z += .75f)
                     {
                         if (!piso.Raycast(new Ray(new Vector3(x, b.max.y + 1f, z), Vector3.down), out var chao, 3f)) continue;
+                        if (pegada.HasValue && (chao.point.x < pegada.Value.min.x || chao.point.x > pegada.Value.max.x
+                            || chao.point.z < pegada.Value.min.z || chao.point.z > pegada.Value.max.z)) { ignorados++; continue; }
                         total++;
                         var coberto = Physics.RaycastAll(chao.point + Vector3.up * 1.2f, Vector3.up, 6f, ~0, QueryTriggerInteraction.Ignore)
                             .Any(h => h.point.y >= chao.point.y + 2.2f);
                         if (!coberto) descobertos.Add(chao.point);
                     }
                 }
+                if (ignorados > 0) r.Info($"{nome}: {ignorados} pontos fora da pegada do Teto (área externa), ignorados");
                 if (descobertos.Count == 0) r.Ok($"{nome}: {total} pontos, todos cobertos");
                 else
                 {
