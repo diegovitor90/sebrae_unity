@@ -143,7 +143,7 @@ namespace SebraeLab.Missions
 
         internal void AoEntrarNoTrigger(BowlingTrigger.Tipo tipo, Collider outro)
         {
-            if (outro.attachedRigidbody != corpoBola || FaseAtual != Fase.Rolando) return;
+            if (outro.attachedRigidbody != corpoBola || (FaseAtual != Fase.Solta && FaseAtual != Fase.Rolando)) return;
             if (tipo == BowlingTrigger.Tipo.Calha) tocouCalha = true;
             else if (tipo == BowlingTrigger.Tipo.Fundo) chegouAoFundo = true;
         }
@@ -158,7 +158,7 @@ namespace SebraeLab.Missions
                 var vibrador = args.interactorObject.transform.GetComponentInParent<HapticImpulsePlayer>();
                 if (vibrador) vibrador.SendHapticImpulse(.4f, .08f);
             }
-            if (FaseAtual == Fase.Pronta) { FaseAtual = Fase.Solta; tempoFase = 0f; }
+            if (FaseAtual == Fase.Pronta) { tocouCalha = false; chegouAoFundo = false; FaseAtual = Fase.Solta; tempoFase = 0f; }
         }
 
         void FixedUpdate()
@@ -232,8 +232,6 @@ namespace SebraeLab.Missions
         void ComecarJogada()
         {
             for (int i = 0; i < pinos.Count; i++) emPeNoInicio[i] = pinos[i].gameObject.activeInHierarchy && !Derrubado(i);
-            tocouCalha = false;
-            chegouAoFundo = false;
             tempoFase = 0f;
             tempoLento = 0f;
             FaseAtual = Fase.Rolando;
@@ -243,7 +241,7 @@ namespace SebraeLab.Missions
         {
             Partida.RegistrarBola(PinosDerrubadosNestaJogada, tocouCalha);
             if (!string.IsNullOrEmpty(Partida.Destaque)) destaqueAte = Time.time + duracaoDestaque;
-            DevolverBola();
+            if (!Bola.isSelected) DevolverBola();
             if (Partida.RodadaEncerrada)
             {
                 FaseAtual = Fase.AguardandoRearme;

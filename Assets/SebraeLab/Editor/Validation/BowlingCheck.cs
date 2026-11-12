@@ -159,6 +159,13 @@ namespace SebraeLab.Editor
             for (float t = 0; t < LimiteJogada && EmJogada(lane); t += Time.deltaTime) yield return null;
             r.Check(lane.Partida.PinosNestaBola == 0 && lane.Partida.Destaque == "CALHA", $"calha: {lane.Partida.PinosNestaBola} pino(s), destaque '{lane.Partida.Destaque}'");
             r.Check(lane.Placar.text.StartsWith("CALHA"), $"placar destaca CALHA: \"{lane.Placar.text.Replace("\n", " | ")}\"");
+
+            // A bola já nasce dentro do trigger da calha, em movimento: o evento de entrada chega antes de a jogada começar a rolar.
+            lane.Rearmar();
+            yield return new WaitForFixedUpdate();
+            Soltar(lane, new Vector3(fundo.center.x, fundo.max.y + lane.RaioBola + .01f, lane.Pista.bounds.min.z + 1f), Vector3.forward * 6f, false);
+            for (float t = 0; t < LimiteJogada && EmJogada(lane); t += Time.deltaTime) yield return null;
+            r.Check(lane.Partida.PinosNestaBola == 0 && lane.Partida.Destaque == "CALHA", $"calha soltando já dentro da calha: {lane.Partida.PinosNestaBola} pino(s), destaque '{lane.Partida.Destaque}'");
         }
 
         static IEnumerator Rearme(BowlingLane lane, Relatorio r)
