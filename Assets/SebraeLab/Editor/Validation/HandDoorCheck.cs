@@ -83,8 +83,36 @@ namespace SebraeLab.Editor
                 Pegar(mao);
                 Girar(150f); porta.Tick(.02f);
                 Check(porta.Angle <= HandDoor.MaxAngle + .01f && porta.Angle >= HandDoor.MaxAngle - 1f, $"não passa de {HandDoor.MaxAngle}° ({porta.Angle:0.#}°)");
-                Girar(-200f); porta.Tick(.02f);
+                for (int i = 0; i < 10; i++) { Girar(-20f); porta.Tick(.02f); } // em passos: a porta acumula quadro a quadro
                 Check(porta.Angle >= 0f && porta.Angle < 1f, $"não passa de 0° ({porta.Angle:0.#}°)");
+                Soltar(mao);
+
+                // Pegada de longe (raio): alterna a porta inteira em vez de seguir o controle.
+                var longe = macaneta.transform.position + Vector3.right * 1.5f;
+                mao.transform.position = longe;
+                Pegar(mao); for (int i = 0; i < 60; i++) porta.Tick(.02f);
+                Check(Mathf.Approximately(porta.Angle, HandDoor.MaxAngle) && !porta.Following, $"pegada de longe (1,5 m) abre a porta inteira e não segue a mão ({porta.Angle:0.#}°)");
+                mao.transform.position = longe;
+                Pegar(mao); for (int i = 0; i < 60; i++) porta.Tick(.02f);
+                Check(porta.Angle == 0f && !porta.Following, $"pegada de longe de novo fecha a porta ({porta.Angle:0.#}°)");
+
+                // Passável a partir de 30°, aberta (direção do Toggle) só acima de 45°.
+                mao.transform.position = macaneta.transform.position;
+                Pegar(mao);
+                Girar(35f); porta.Tick(.02f);
+                Check(porta.IsPassable && !porta.IsOpen, $"a 35° a porta é passável e ainda não conta como aberta ({porta.Angle:0.#}°)");
+                Girar(-10f); porta.Tick(.02f);
+                Check(!porta.IsPassable, $"a 25° a porta não é passável ({porta.Angle:0.#}°)");
+                Girar(-25f); porta.Tick(.02f);
+                Soltar(mao);
+
+                // Contornar a dobradiça segurando a maçaneta não faz a porta saltar.
+                mao.transform.position = macaneta.transform.position;
+                Pegar(mao);
+                for (int i = 0; i < 9; i++) { Girar(20f); porta.Tick(.02f); }
+                Check(Mathf.Approximately(porta.Angle, HandDoor.MaxAngle), $"mão deu 180° em volta da dobradiça e a porta ficou no limite, sem saltar ({porta.Angle:0.#}°)");
+                for (int i = 0; i < 9; i++) { Girar(-20f); porta.Tick(.02f); }
+                Check(porta.Angle == 0f, $"mão voltou 180° e a porta fechou ({porta.Angle:0.#}°)");
                 Soltar(mao);
             }
             catch (Exception e)

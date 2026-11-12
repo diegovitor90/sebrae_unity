@@ -15,16 +15,19 @@ namespace SebraeLab.Missions
     {
         public const float MaxAngle = 95f;
         public const float OpenThreshold = 45f;
+        public const float PassableAngle = 30f;
+        public const float NearGrabDistance = .45f;
 
         [Tooltip("Segundos para ir de fechada a totalmente aberta pelo Toggle.")]
         public float animationSeconds = .65f;
 
         public float Angle { get; private set; }
         public bool IsOpen => Angle > OpenThreshold;
+        public bool IsPassable => Angle > PassableAngle;
         public bool Following => hand;
 
         Transform hand;
-        float handStartYaw, doorStartAngle;
+        float lastYaw, followAngle;
         bool animating;
         float animFrom, animTo, animTime, animDuration;
 
@@ -51,8 +54,8 @@ namespace SebraeLab.Missions
         {
             animating = false;
             hand = follower;
-            handStartYaw = YawAroundHinge(follower.position);
-            doorStartAngle = Angle;
+            lastYaw = YawAroundHinge(follower.position);
+            followAngle = Angle;
         }
 
         public void EndFollow() => hand = null;
@@ -61,7 +64,10 @@ namespace SebraeLab.Missions
         {
             if (hand)
             {
-                Apply(doorStartAngle + Mathf.DeltaAngle(handStartYaw, YawAroundHinge(hand.position)));
+                var yaw = YawAroundHinge(hand.position);
+                followAngle = Mathf.Clamp(followAngle + Mathf.DeltaAngle(lastYaw, yaw), 0f, MaxAngle);
+                lastYaw = yaw;
+                Apply(followAngle);
             }
             else if (animating)
             {
@@ -93,6 +99,9 @@ namespace SebraeLab.Missions
             var interactor = args != null ? args.interactorObject as Object : null;
             if (!interactor) { Toggle(); return; }
             var follower = args.interactorObject.transform;
+            // Pegada de longe (raio): a mão quase não gira a porta, então alterna inteira.
+            var alvo = args.interactableObject as Component;
+            if (alvo && Vector3.Distance(follower.position, alvo.transform.position) > NearGrabDistance) { Toggle(); return; }
             BeginFollow(follower);
             var haptics = follower.GetComponentInParent<HapticImpulsePlayer>();
             if (haptics) haptics.SendHapticImpulse(.3f, .05f);

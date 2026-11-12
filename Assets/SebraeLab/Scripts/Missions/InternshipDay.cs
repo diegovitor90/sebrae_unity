@@ -11,7 +11,7 @@ namespace SebraeLab.Missions
         ManagerMission mission;
         Transform hinge;
         HandDoor door;
-        public bool DoorOpen => door && door.IsOpen;
+        public bool DoorOpen => door && door.IsPassable;
         readonly Color navy = new Color(.04f,.13f,.22f), teal = new Color(.04f,.58f,.59f), gold = new Color(1,.68f,.14f);
         readonly MissionSurfaces surfaces = new MissionSurfaces();
         readonly List<Action> ticks = new List<Action>();
