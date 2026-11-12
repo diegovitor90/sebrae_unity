@@ -38,7 +38,7 @@ Regras da rodada, sem dependência de cena:
 - `int Rodada`, `int Bola` (1 ou 2), `int PinosNestaBola`, `int PontosDaRodada`, `int Total`, `string Destaque` ("STRIKE", "SPARE", "CALHA" ou vazio), `bool RodadaEncerrada`.
 - `void RegistrarBola(int pinos, bool calha)`: pinos é a quantidade derrubada nesta bola, de 0 a 10. Na bola 1, 10 pinos marcam STRIKE e encerram a rodada. Na bola 2, se a soma das duas bolas for 10, marca SPARE; a rodada encerra depois da bola 2. Calha com 0 pinos marca CALHA. Os pontos da rodada são a soma dos pinos derrubados, sem bônus. O total soma os pontos ao encerrar a rodada.
 - `void ProximaRodada()`: avança para a rodada seguinte, bola 1.
-- `void RecomecarRodada()`: volta à bola 1 da rodada atual, descarta os pinos da rodada e não mexe no total.
+- `void RecomecarRodada()`: volta à bola 1 da rodada atual, descarta os pinos da rodada e não mexe no total. Se a rodada já estava encerrada (os pontos dela já entraram no total), avança para a próxima, para não contar a mesma rodada duas vezes.
 
 ### `BowlingLane` (componente)
 
@@ -46,11 +46,11 @@ Recebe do `InternshipDay` a pista, as calhas, os pinos com as posições de orig
 
 1. **Física.** Aplica os materiais de `Resources/Fisica/`: `Pista` na pista e nas calhas (atrito dinâmico e estático 0,05, combinação mínima, quique 0), `Bola` na bola (atrito 0,2, quique 0) e `Pino` nos colisores dos pinos (atrito 0,4, quique 0,3). Massa da bola 6 kg, massa dos pinos 1,5 kg, rotação máxima da bola 60 rad/s, interpolação ligada na bola.
 2. **Triggers.** Cria, a partir das medidas da pista:
-   - Área de lançamento: x 43,52 a 46,48, z -6 a -3,5, de y 0 a 2.
-   - Calha esquerda e calha direita: sobre cada calha, de z -3,5 a 5,5, de y -0,2 a 0,1.
-   - Fundo: x 43,52 a 46,48, z 5,6 a 8, de y 0 a 1.
+   - Área de lançamento: x 43,52 a 46,48, z -6 a -2 (piso de lançamento e o primeiro 1,5 m da pista), de y 0 a 2.
+   - Calha esquerda e calha direita: sobre cada calha, de z -3,5 a 5,5, de y -0,2 a 0 (abaixo da superfície da pista, para a bola que rola rente à borda não contar como calha).
+   - Fundo: x 43,52 a 46,48, z 5,2 a 8, de y -0,2 a 1 (a bola que corre na calha para no degrau em z 5,5 e precisa entrar nele).
 3. **Ajuda no arremesso.** Ao `selectExited` da bola com um interactor de verdade (não nulo) e com a bola dentro da área de lançamento, no `FixedUpdate` seguinte:
-   - se a bola estiver a até 0,6 m acima da superfície da pista, posiciona a bola apoiada nela (y = 0,08 + raio) e zera a velocidade vertical;
+   - se houver superfície a até 0,6 m abaixo da bola (raio para baixo, ignorando triggers e a própria bola), posiciona a bola apoiada nela (y = ponto atingido + raio) e zera a velocidade vertical; o piso de lançamento fica 8 cm abaixo da pista, por isso o apoio usa a superfície real embaixo da bola;
    - limita o ângulo da velocidade horizontal a 10° do eixo +z da pista;
    - limita a velocidade horizontal entre 3 e 12 m/s;
    - envia uma vibração curta ao controle que soltou (o `HapticImpulsePlayer` acima do interactor).
@@ -83,7 +83,7 @@ A conferência do texto antigo ("BOLICHE • n / 10") passa a ler o placar novo:
 - `BowlingRoundCheck` (EditMode, batchmode), escrito antes do código: strike, spare, rodada aberta, calha, bola 2 após strike não existe, rearme sem perder o total, total somando três rodadas.
 - `BowlingCheck` (Play, editor com janela que fecha sozinho), com relatório em `Logs/bowling-check.txt`:
   - materiais e massas aplicados à pista, às calhas, à bola e aos pinos;
-  - arremesso simulado por um `XRDirectInteractor` de teste soltando a bola na área de lançamento a 1 m de altura, com velocidade inclinada 25° e 2 m/s: depois da ajuda, a bola está apoiada na pista, com direção a até 10° do eixo e velocidade entre 3 e 12 m/s;
+  - arremesso simulado por um `XRDirectInteractor` de teste soltando a bola 0,5 m acima do início da pista, com velocidade inclinada 25° e 2 m/s: depois da ajuda, a bola está apoiada na pista, com direção a até 10° do eixo e velocidade entre 3 e 12 m/s;
   - arremesso reto a 8 m/s pelo centro: ao menos 1 pino derrubado registrado, bola de volta ao suporte, rodada na bola 2 com os derrubados desativados (ou rodada seguinte se for strike);
   - arremesso direto na calha: destaque CALHA e 0 pinos;
   - REARMAR: 10 pinos em pé e ativos, bola 1, total igual ao de antes.
