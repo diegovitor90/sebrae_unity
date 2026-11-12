@@ -79,6 +79,7 @@ namespace SebraeLab.Missions
             AddLitRoof(new Vector3(18,2.78f,0),new Vector3(4,.12f,5.2f));
             AddLitRoof(new Vector3(26,3.23f,0),new Vector3(12,.12f,10));
             AddLitRoof(new Vector3(36.5f,3,0),new Vector3(9,.12f,3.2f));
+            AddLitRoof(new Vector3(14,3,2.5f),new Vector3(4,.12f,9)); // Galeria da praça
             BuildWing();
             BuildLounge();
             loungeGate=Shape("Porta da descompressão",new Vector3(41,1.2f,0),new Vector3(.12f,2.4f,2.4f),teal);
