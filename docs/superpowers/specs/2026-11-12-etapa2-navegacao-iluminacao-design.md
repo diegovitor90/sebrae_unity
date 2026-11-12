@@ -76,3 +76,10 @@ Bake, light probes, reflection probes, porta com Hinge Joint, troca das primitiv
 - A porta gira pelo transform. Se o jogador estiver no caminho, a porta atravessa o corpo dele em vez de empurrá-lo.
 - `InternshipDay` continua sendo editado pelo Richardson. A mudança nele se limita a ligações; a lógica da porta sai para `HandDoor`.
 - Luzes por vértice em primitivas grandes têm efeito sutil. A sensação de lugar iluminado vem das luminárias emissivas e da luz direcional.
+
+## Ajustes após a revisão final
+
+- Pegada de longe (raio) a mais de 0,45 m da maçaneta abre ou fecha a porta inteira em vez de seguir o controle.
+- A missão da Sala 2 conclui com a porta aberta acima de 30° (`IsPassable`). `IsOpen` (45°) continua definindo a direção do Toggle.
+- O ângulo da porta acumula quadro a quadro para não saltar ao contornar a dobradiça.
+- O NavigationCheck usa altura de 1,75 m no corpo de teste e falha se o degrau do rig não for 0,3 m.

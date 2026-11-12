@@ -142,6 +142,8 @@ namespace SebraeLab.Editor
             var rig = Object.FindObjectsByType<CharacterController>(FindObjectsInactive.Include, FindObjectsSortMode.None)
                 .FirstOrDefault(c => c.gameObject.name == "Jogador VR - Recepcao");
             if (!rig) { r.Falha("CharacterController do rig 'Jogador VR - Recepcao' não encontrado"); yield break; }
+            if (Mathf.Abs(rig.stepOffset - .3f) > .01f) r.Falha($"degrau do rig {rig.stepOffset:0.##} m (esperado 0,3 m pela medição da rota)");
+            else r.Ok("degrau do rig em 0,3 m");
 
             var pc = mission.playerRoot ? mission.playerRoot.GetComponent<CharacterController>() : null;
             if (pc && pc != rig) pc.enabled = false; // o corpo do modo PC não pode bloquear o teste
@@ -152,8 +154,9 @@ namespace SebraeLab.Editor
             if (portao) { portao.SetActive(false); r.Info("Porta da descompressão aberta para o teste"); }
 
             var corpo = new GameObject("Corpo de teste (rig VR)").AddComponent<CharacterController>();
-            corpo.height = rig.height; corpo.radius = rig.radius; corpo.center = rig.center;
-            corpo.stepOffset = rig.stepOffset; corpo.slopeLimit = rig.slopeLimit; corpo.skinWidth = rig.skinWidth;
+            corpo.radius = rig.radius; corpo.stepOffset = rig.stepOffset; corpo.slopeLimit = rig.slopeLimit; corpo.skinWidth = rig.skinWidth;
+            corpo.height = Mathf.Max(rig.height, 1.75f); // altura do jogador no Quest
+            corpo.center = new Vector3(rig.center.x, corpo.height / 2f + corpo.skinWidth, rig.center.z);
             corpo.transform.position = Rota[0];
             r.Info($"Corpo: raio {corpo.radius:0.##} m, altura {corpo.height:0.##} m, degrau {corpo.stepOffset:0.##} m, inclinação {corpo.slopeLimit:0}°");
             Physics.SyncTransforms();
