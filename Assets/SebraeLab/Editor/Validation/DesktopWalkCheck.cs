@@ -139,7 +139,7 @@ internal static class DesktopWalkCheck
         for(float wait=0;wait<12 && lane.FaseAtual!=BowlingLane.Fase.Pronta && lane.FaseAtual!=BowlingLane.Fase.AguardandoRearme;wait+=Time.deltaTime)yield return null;
         var pins=lane.Partida.PinosNestaBola;
         Require(pins>0,"Bola não derrubou pinos, posição "+ball.position);
-        Require(lane.Placar.text.Contains("Nesta bola: "+pins),"Placar de boliche incorreto: "+lane.Placar.text);
+        Require(lane.Placar.text.Contains("Nesta bola: "+pins+"   "),"Placar de boliche incorreto: "+lane.Placar.text);
         Note("Boliche: "+pins+" pinos derrubados");
         yield return Click("Arco arcade");
         var target=GameObject.Find("Alvo luminoso").transform;
