@@ -103,6 +103,7 @@ namespace SebraeLab.Missions
             CriarTrigger("Fundo da pista", BowlingTrigger.Tipo.Fundo,
                 new Vector3(b.center.x, .4f, b.max.z + 1.1f), new Vector3(largura, 1.2f, 2.8f));
 
+            bola.selectEntered.AddListener(AoPegar);
             bola.selectExited.AddListener(AoSoltar);
             AtualizarPlacar();
         }
@@ -148,8 +149,24 @@ namespace SebraeLab.Missions
             else if (tipo == BowlingTrigger.Tipo.Fundo) chegouAoFundo = true;
         }
 
+        void AoPegar(SelectEnterEventArgs args)
+        {
+            // Pegar a bola durante a pausa do rearme encerra a pausa; args pode ser nulo (modo PC).
+            if (FaseAtual == Fase.AguardandoRearme) FecharRodada();
+        }
+
+        void FecharRodada()
+        {
+            LevantarPinos();
+            Partida.ProximaRodada();
+            FaseAtual = Fase.Pronta;
+        }
+
         void AoSoltar(SelectExitEventArgs args)
         {
+            // Passar a bola de uma mão para a outra não é soltar.
+            if (Bola.isSelected) return;
+            if (FaseAtual == Fase.AguardandoRearme) FecharRodada();
             // Sem interactor: modo PC ou validador. A ajuda é só para quem solta com o controle.
             var interactor = args != null ? args.interactorObject as Object : null;
             if (interactor && AreaDeLancamento.bounds.Contains(corpoBola.position))
@@ -170,6 +187,8 @@ namespace SebraeLab.Missions
 
         void AplicarAjuda()
         {
+            if (Bola.isSelected || corpoBola.isKinematic) return;
+            Physics.SyncTransforms(); // no Quest o XRI move o Transform e a pose do Rigidbody pode estar uma etapa atrás
             var velocidade = corpoBola.linearVelocity;
             var posicao = corpoBola.position;
             RaycastHit? apoio = null;
@@ -178,9 +197,18 @@ namespace SebraeLab.Missions
             if (apoio.HasValue)
             {
                 posicao.y = apoio.Value.point.y + RaioBola;
-                corpoBola.position = posicao;
                 velocidade.y = 0f;
             }
+            // O piso de lançamento fica 8 cm abaixo da pista: a bola atrás do início da pista sobe para ela, sem bater no degrau.
+            var pb = Pista.bounds;
+            if (posicao.z < pb.min.z && Mathf.Abs(posicao.x - pb.center.x) < pb.extents.x - RaioBola)
+            {
+                posicao.y = pb.max.y + RaioBola;
+                posicao.z = pb.min.z + RaioBola;
+                velocidade.y = 0f;
+            }
+            corpoBola.transform.position = posicao;
+            corpoBola.position = posicao;
             var eixo = Vector3.ProjectOnPlane(Pista.transform.forward, Vector3.up).normalized;
             var horizontal = new Vector3(velocidade.x, 0f, velocidade.z);
             float angulo = horizontal.sqrMagnitude > 1e-4f
@@ -220,9 +248,7 @@ namespace SebraeLab.Missions
                     tempoFase += dt;
                     if (tempoFase > pausaRearme)
                     {
-                        LevantarPinos();
-                        Partida.ProximaRodada();
-                        FaseAtual = Fase.Pronta;
+                        FecharRodada();
                     }
                     break;
             }

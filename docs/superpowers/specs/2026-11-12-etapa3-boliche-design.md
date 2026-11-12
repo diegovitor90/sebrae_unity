@@ -51,6 +51,7 @@ Recebe do `InternshipDay` a pista, as calhas, os pinos com as posições de orig
    - Fundo: x 43,52 a 46,48, z 5,2 a 8, de y -0,2 a 1 (a bola que corre na calha para no degrau em z 5,5 e precisa entrar nele).
 3. **Ajuda no arremesso.** Ao `selectExited` da bola com um interactor de verdade (não nulo) e com a bola dentro da área de lançamento, no `FixedUpdate` seguinte:
    - se houver superfície a até 0,6 m abaixo da bola (raio para baixo, ignorando triggers e a própria bola), posiciona a bola apoiada nela (y = ponto atingido + raio) e zera a velocidade vertical; o piso de lançamento fica 8 cm abaixo da pista, por isso o apoio usa a superfície real embaixo da bola;
+   - se a bola estiver atrás do início da pista e dentro da largura dela, é colocada no começo da pista (o piso de lançamento fica 8 cm abaixo e o degrau tirava quase toda a velocidade);
    - limita o ângulo da velocidade horizontal a 10° do eixo +z da pista;
    - limita a velocidade horizontal entre 3 e 12 m/s;
    - envia uma vibração curta ao controle que soltou (o `HapticImpulsePlayer` acima do interactor).
@@ -60,7 +61,7 @@ Recebe do `InternshipDay` a pista, as calhas, os pinos com as posições de orig
    - Rolando: depois de solta, a bola passa de 0,5 m/s. Durante a jogada, o placar mostra ao vivo quantos pinos estão derrubados nesta bola.
    - Assentando: a bola entrou no trigger do fundo, ou ficou abaixo de 0,1 m/s por 1 s, ou passaram 8 s desde que foi solta.
    - Contagem: quando todos os pinos dormem (`Rigidbody.IsSleeping`) ou no máximo 3 s depois de assentar, conta como derrubado nesta bola o pino ativo que estava em pé no início da jogada e agora está inclinado mais de 35° ou a mais de 15 cm da posição de origem no plano horizontal. Calha vale se a bola tocou um trigger de calha nesta jogada.
-   - Depois da contagem: `BowlingRound.RegistrarBola`, devolve a bola ao suporte parada e, se a rodada continuar, desativa os pinos derrubados (varredura). Se a rodada encerrar, 2 s depois os 10 pinos voltam em pé, ativos, e `ProximaRodada` é chamado.
+   - Depois da contagem: `BowlingRound.RegistrarBola`, devolve a bola ao suporte parada e, se a rodada continuar, desativa os pinos derrubados (varredura). Se a rodada encerrar, 2 s depois os 10 pinos voltam em pé, ativos, e `ProximaRodada` é chamado. Pegar ou soltar a bola durante a pausa do rearme encerra a pausa na hora: os pinos voltam e a rodada seguinte começa.
    - Pinos derrubados fora de uma jogada não contam: na jogada seguinte eles já não estão em pé no início, e o REARMAR os levanta.
 5. **Placar.** Duas linhas no texto existente:
    `BOLICHE • RODADA n • BOLA b` (ou o destaque STRIKE, SPARE ou CALHA por 2 s no lugar de "BOLICHE")

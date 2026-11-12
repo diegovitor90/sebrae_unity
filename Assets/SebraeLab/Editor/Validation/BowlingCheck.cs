@@ -65,7 +65,7 @@ namespace SebraeLab.Editor
             {
                 Fisica(lane, r);
                 // Passos executados no mesmo iterador: uma exceção chega ao finally e o relatório sai mesmo assim.
-                foreach (var passo in new Func<BowlingLane, Relatorio, IEnumerator>[] { Ajuda, ArremessoReto, Calha, Rearme })
+                foreach (var passo in new Func<BowlingLane, Relatorio, IEnumerator>[] { Ajuda, ArremessoReto, PausaDoRearme, Calha, Rearme })
                 {
                     var e = passo(lane, r);
                     while (e.MoveNext()) yield return e.Current;
@@ -118,6 +118,18 @@ namespace SebraeLab.Editor
             r.Check(horizontal.magnitude >= 2.95f && horizontal.magnitude <= 12.05f, $"velocidade {horizontal.magnitude:0.##} m/s (soltou a 2 m/s)");
             for (float t = 0; t < LimiteJogada && EmJogada(lane); t += Time.deltaTime) yield return null;
             r.Info($"jogada da ajuda terminou com {lane.Partida.PinosNestaBola} pino(s)");
+
+            // Soltar baixo sobre o piso de lançamento (8 cm abaixo da pista): a bola precisa subir para a pista sem bater no degrau.
+            lane.Rearmar();
+            yield return new WaitForFixedUpdate();
+            Soltar(lane, new Vector3(45.6f, .155f + .3f, -4.0f), Vector3.forward * 5f, true);
+            yield return new WaitForSeconds(.3f);
+            var v2 = corpo.linearVelocity;
+            float apoio2 = corpo.position.y - lane.RaioBola - pista.max.y;
+            float rapidez2 = new Vector3(v2.x, 0f, v2.z).magnitude;
+            r.Check(Mathf.Abs(apoio2) < .03f, $"soltura baixa: bola apoiada na pista depois de 0,3 s (folga {apoio2:0.###} m, z {corpo.position.z:0.##})");
+            r.Check(rapidez2 >= 4.0f, $"soltura baixa: velocidade horizontal {rapidez2:0.##} m/s (soltou a 5 m/s, mínimo 4)");
+            for (float t = 0; t < LimiteJogada && EmJogada(lane); t += Time.deltaTime) yield return null;
         }
 
         static IEnumerator ArremessoReto(BowlingLane lane, Relatorio r)
@@ -134,7 +146,7 @@ namespace SebraeLab.Editor
             r.Check(n >= 1, $"derrubou {n} pino(s)");
             var corpo = lane.Bola.GetComponent<Rigidbody>();
             r.Check(Vector3.Distance(corpo.position, lane.SuporteBola) < .05f, $"bola de volta ao suporte (a {Vector3.Distance(corpo.position, lane.SuporteBola):0.###} m)");
-            r.Check(lane.Placar.text.Contains("Nesta bola: " + n), $"placar mostra a bola: \"{lane.Placar.text.Replace("\n", " | ")}\"");
+            r.Check(lane.Placar.text.Contains("Nesta bola: " + n + "   "), $"placar mostra a bola: \"{lane.Placar.text.Replace("\n", " | ")}\"");
             if (n == 10)
             {
                 r.Check(lane.Partida.Destaque == "STRIKE" && lane.FaseAtual == BowlingLane.Fase.AguardandoRearme, "strike encerra a rodada e aguarda o rearme");
@@ -147,6 +159,34 @@ namespace SebraeLab.Editor
                 int varridos = lane.Pinos.Count(p => !p.gameObject.activeSelf);
                 r.Check(varridos == n, $"{varridos} pino(s) varrido(s) da pista (esperado {n})");
             }
+        }
+
+        static IEnumerator PausaDoRearme(BowlingLane lane, Relatorio r)
+        {
+            r.Secao("Pausa do rearme");
+            lane.Rearmar();
+            yield return new WaitForFixedUpdate();
+            var pista = lane.Pista.bounds;
+            var largada = new Vector3(pista.center.x, pista.max.y + lane.RaioBola + .01f, pista.min.z + .5f);
+            Soltar(lane, largada, Vector3.forward * 8f, true);
+            for (float t = 0; t < LimiteJogada && EmJogada(lane); t += Time.deltaTime) yield return null;
+            if (lane.FaseAtual != BowlingLane.Fase.AguardandoRearme)
+            {
+                // Sem strike: a segunda bola fecha a rodada, seja qual for o resultado.
+                Soltar(lane, largada, Vector3.forward * 8f, true);
+                for (float t = 0; t < LimiteJogada && EmJogada(lane); t += Time.deltaTime) yield return null;
+            }
+            r.Check(lane.FaseAtual == BowlingLane.Fase.AguardandoRearme, $"rodada fechada, em pausa (fase {lane.FaseAtual})");
+            int rodadaAntes = lane.Partida.Rodada;
+            Soltar(lane, largada, Vector3.forward * 8f, true);
+            r.Check(lane.FaseAtual != BowlingLane.Fase.AguardandoRearme, $"soltar na pausa encerra a pausa na hora (fase {lane.FaseAtual})");
+            r.Check(lane.Pinos.All(p => p.gameObject.activeSelf), "10 pinos ativos depois de soltar na pausa");
+            r.Check(lane.Partida.Rodada == rodadaAntes + 1, $"rodada avançou (de {rodadaAntes} para {lane.Partida.Rodada})");
+            for (float t = 0; t < LimiteJogada && EmJogada(lane); t += Time.deltaTime) yield return null;
+            r.Check(lane.Partida.PinosNestaBola >= 0 && (lane.FaseAtual == BowlingLane.Fase.Pronta || lane.FaseAtual == BowlingLane.Fase.AguardandoRearme),
+                $"a bola solta na pausa foi contada ({lane.Partida.PinosNestaBola} pino(s), fase {lane.FaseAtual})");
+            var corpo = lane.Bola.GetComponent<Rigidbody>();
+            r.Check(Vector3.Distance(corpo.position, lane.SuporteBola) < .05f, $"bola de volta ao suporte (a {Vector3.Distance(corpo.position, lane.SuporteBola):0.###} m)");
         }
 
         static IEnumerator Calha(BowlingLane lane, Relatorio r)
@@ -206,6 +246,7 @@ namespace SebraeLab.Editor
                 quem = mao.AddComponent<XRDirectInteractor>();
             }
             lane.Bola.selectExited.Invoke(new SelectExitEventArgs { interactorObject = quem, interactableObject = lane.Bola });
+            if (quem != null) UnityEngine.Object.Destroy(((Component)quem).gameObject);
         }
     }
 }
