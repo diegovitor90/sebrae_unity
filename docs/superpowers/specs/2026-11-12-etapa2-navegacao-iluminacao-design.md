@@ -82,4 +82,5 @@ Bake, light probes, reflection probes, porta com Hinge Joint, troca das primitiv
 - Pegada de longe (raio) a mais de 0,45 m da maçaneta abre ou fecha a porta inteira em vez de seguir o controle.
 - A missão da Sala 2 conclui com a porta aberta acima de 30° (`IsPassable`). `IsOpen` (45°) continua definindo a direção do Toggle.
 - O ângulo da porta acumula quadro a quadro para não saltar ao contornar a dobradiça.
-- O NavigationCheck usa altura de 1,75 m no corpo de teste e falha se o degrau do rig não for 0,3 m.
+- O NavigationCheck usa altura de 1,75 m no corpo de teste e falha se o degrau do rig não for 0,15 m.
+- O degrau do jogador é 0,15 m, não 0,3 m. O CharacterController ergue a cápsula inteira pela altura do degrau ao andar, e a barra diagonal da entrada, a 2,01 m do chão, travava jogadores altos. A maior subida medida na rota é 0,107 m.

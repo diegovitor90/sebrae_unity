@@ -24,7 +24,7 @@ namespace SebraeLab.Editor
         const string Request = "Logs/navigation-check.request";
         const string Report = "Logs/navigation-check.txt";
         const string ExitKey = "NavigationCheck.Exit";
-        const float DegrauDesejado = .3f; // obstáculo mais alto que isso bloqueia a rota
+        const float DegrauEsperado = .15f; // degrau do jogador; a barra da entrada fica a 2,01 m do chão
         const float Grade = .2f;
 
         static readonly string[] PisosCobertos =
@@ -142,8 +142,8 @@ namespace SebraeLab.Editor
             var rig = Object.FindObjectsByType<CharacterController>(FindObjectsInactive.Include, FindObjectsSortMode.None)
                 .FirstOrDefault(c => c.gameObject.name == "Jogador VR - Recepcao");
             if (!rig) { r.Falha("CharacterController do rig 'Jogador VR - Recepcao' não encontrado"); yield break; }
-            if (Mathf.Abs(rig.stepOffset - .3f) > .01f) r.Falha($"degrau do rig {rig.stepOffset:0.##} m (esperado 0,3 m pela medição da rota)");
-            else r.Ok("degrau do rig em 0,3 m");
+            if (Mathf.Abs(rig.stepOffset - DegrauEsperado) > .01f) r.Falha($"degrau do rig {rig.stepOffset:0.##} m (esperado 0,15 m: barra da entrada a 2,01 m)");
+            else r.Ok("degrau do rig em 0,15 m");
 
             var pc = mission.playerRoot ? mission.playerRoot.GetComponent<CharacterController>() : null;
             if (pc && pc != rig) pc.enabled = false; // o corpo do modo PC não pode bloquear o teste
@@ -326,7 +326,7 @@ namespace SebraeLab.Editor
             {
                 if (!Physics.Raycast(v + Vector3.up * .6f, Vector3.down, out var chao, 1.2f, ~0, QueryTriggerInteraction.Ignore)) return false;
                 if (chao.point.y < -.3f || chao.point.y > .5f) return false;
-                var baixo = new Vector3(v.x, chao.point.y + DegrauDesejado + corpo.radius, v.z);
+                var baixo = new Vector3(v.x, chao.point.y + corpo.stepOffset + corpo.radius, v.z);
                 var alto = new Vector3(v.x, Mathf.Max(baixo.y, chao.point.y + corpo.height - corpo.radius), v.z);
                 return !Physics.OverlapCapsule(baixo, alto, corpo.radius + .04f, ~0, QueryTriggerInteraction.Ignore)
                     .Any(c => c != corpo);
