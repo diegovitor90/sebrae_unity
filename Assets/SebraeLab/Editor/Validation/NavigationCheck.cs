@@ -166,9 +166,27 @@ namespace SebraeLab.Editor
             if (luminarias.Length > 0 && semEmissao.Length == 0) r.Ok($"{luminarias.Length} luminárias com o material LuminariaAcesa");
             else r.Falha($"{semEmissao.Length} de {luminarias.Length} luminárias sem o material LuminariaAcesa");
 
-            var nivel = QualitySettings.names[QualitySettings.GetQualityLevel()];
-            if (QualitySettings.antiAliasing == 4) r.Ok($"MSAA 4x no nível {nivel}");
-            else r.Falha($"MSAA {QualitySettings.antiAliasing}x no nível {nivel} (esperado 4x)");
+            // Em Play, nem o objeto em memória nem o carregado do asset trazem a tabela por plataforma
+            // (m_PerPlatformDefaultQuality vem vazia); por isso o YAML do projeto é lido direto.
+            const string ArquivoQualidade = "ProjectSettings/QualitySettings.asset";
+            var yaml = File.Exists(ArquivoQualidade) ? File.ReadAllText(ArquivoQualidade) : "";
+            var padrao = System.Text.RegularExpressions.Regex.Match(yaml, @"m_PerPlatformDefaultQuality:[\s\S]*?\bAndroid:\s*(\d+)");
+            var blocos = yaml.Split(new[] { "- serializedVersion:" }, StringSplitOptions.None).Skip(1).ToArray();
+            if (!padrao.Success || !int.TryParse(padrao.Groups[1].Value, out int indiceAndroid) || indiceAndroid >= blocos.Length)
+                r.Falha("nível de qualidade padrão do Android não encontrado");
+            else
+            {
+                var bloco = blocos[indiceAndroid];
+                string nome = "", valorAa = "";
+                foreach (var linha in bloco.Split((char)10).Select(l => l.Trim()))
+                {
+                    if (nome == "" && linha.StartsWith("name:")) nome = linha.Substring(5).Trim();
+                    if (linha.StartsWith("antiAliasing:")) valorAa = linha.Substring(13).Trim();
+                }
+                int aa = int.TryParse(valorAa, out var lido) ? lido : -1;
+                if (aa == 4) r.Ok($"MSAA 4x no nível {nome} (Android)");
+                else r.Falha($"MSAA {aa}x no nível {nome} (Android, esperado 4x)");
+            }
         }
 
         static void Tetos(Relatorio r)
@@ -195,8 +213,36 @@ namespace SebraeLab.Editor
                     }
                 }
                 if (descobertos.Count == 0) r.Ok($"{nome}: {total} pontos, todos cobertos");
-                else r.Falha($"{nome}: {descobertos.Count} de {total} pontos sem teto, por exemplo " + string.Join(" ", descobertos.Take(3).Select(Fmt)));
+                else
+                {
+                    r.Falha($"{nome}: {descobertos.Count} de {total} pontos sem teto, por exemplo " + string.Join(" ", descobertos.Take(3).Select(Fmt)));
+                    foreach (var area in Areas(descobertos))
+                        r.Info($"sem teto entre x {area.Min(v => v.x):0.##} e {area.Max(v => v.x):0.##}, z {area.Min(v => v.z):0.##} e {area.Max(v => v.z):0.##}");
+                }
             }
+        }
+
+        /// <summary>Separa os pontos em áreas quando há vão maior que 2 m em X ou Z (divisão 1D simples).</summary>
+        static List<List<Vector3>> Areas(List<Vector3> pontos)
+        {
+            var grupos = new List<List<Vector3>> { pontos };
+            foreach (var eixo in new Func<Vector3, float>[] { v => v.x, v => v.z })
+            {
+                var novos = new List<List<Vector3>>();
+                foreach (var g in grupos)
+                {
+                    var ord = g.OrderBy(eixo).ToList();
+                    var atual = new List<Vector3> { ord[0] };
+                    for (int i = 1; i < ord.Count; i++)
+                    {
+                        if (eixo(ord[i]) - eixo(ord[i - 1]) > 2f) { novos.Add(atual); atual = new List<Vector3>(); }
+                        atual.Add(ord[i]);
+                    }
+                    novos.Add(atual);
+                }
+                grupos = novos;
+            }
+            return grupos;
         }
 
         static IEnumerator Andar(CharacterController corpo, Vector3 alvo, Caminhada estado)
