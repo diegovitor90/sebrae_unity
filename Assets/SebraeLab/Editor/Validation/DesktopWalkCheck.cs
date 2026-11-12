@@ -134,10 +134,12 @@ internal static class DesktopWalkCheck
         pc.UsePointer(true,false);
         Note("Lançamento "+ball.position+" velocidade "+ball.linearVelocity);
         yield return new WaitForSeconds(3);
-        var pins=UnityEngine.Object.FindObjectsByType<Rigidbody>(FindObjectsSortMode.None)
-            .Where(b=>b.name=="Pino").Count(b=>Vector3.Angle(b.transform.up,Vector3.up)>35);
+        // O BowlingLane conta ao fim da jogada e varre os derrubados; espera a contagem antes de conferir.
+        var lane=UnityEngine.Object.FindFirstObjectByType<BowlingLane>();
+        for(float wait=0;wait<12 && lane.FaseAtual!=BowlingLane.Fase.Pronta && lane.FaseAtual!=BowlingLane.Fase.AguardandoRearme;wait+=Time.deltaTime)yield return null;
+        var pins=lane.Partida.PinosNestaBola;
         Require(pins>0,"Bola não derrubou pinos, posição "+ball.position);
-        Require(UnityEngine.Object.FindObjectsByType<TextMesh>(FindObjectsSortMode.None).Any(t=>t.text=="BOLICHE   •   "+pins+" / 10"),"Placar de boliche incorreto");
+        Require(lane.Placar.text.Contains("Nesta bola: "+pins),"Placar de boliche incorreto: "+lane.Placar.text);
         Note("Boliche: "+pins+" pinos derrubados");
         yield return Click("Arco arcade");
         var target=GameObject.Find("Alvo luminoso").transform;
