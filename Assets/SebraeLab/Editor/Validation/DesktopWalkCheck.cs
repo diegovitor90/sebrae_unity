@@ -79,18 +79,38 @@ internal static class DesktopWalkCheck
         pc.UsePointer(true,false);yield return null;yield return null;
     }
     static IEnumerator Route(){
+        foreach(var sample in new[]{new Vector3(-25,1,0),new Vector3(60,1,6),new Vector3(49,1,-14),new Vector3(47,1,17)}){
+            Require(Physics.Raycast(sample,Vector3.down,out var hit,2) && hit.collider.name=="Gramado","Falha no gramado em "+sample);
+        }
+        body.enabled=false;body.transform.position=new Vector3(-20,-4,0);body.enabled=true;
+        yield return null;yield return null;
+        Require(Vector3.Distance(body.transform.position,new Vector3(5.7f,0,7.1f))<.4f,"Recuperação de queda");
+        Note("Gramado nos quatro setores e recuperação de queda OK");
         yield return Walk(m.manager.position+Vector3.up*1.35f,1.7f);
         for(int i=0;i<=m.dialogue.Length;i++)m.Interact();
         Require(m.State==ManagerMissionState.FindRoom,"Diálogo");Note("1 OK gerente");
         var knob=GameObject.Find("Maçaneta");
         yield return Walk(knob.transform.position,1.22f,knob);
-        m.Interact();Require(m.day.DoorOpen,"Porta fechada");
+        pc.UsePointer(true,false);
+        yield return new WaitForSeconds(.8f);
+        Require(m.day.DoorOpen,"Maçaneta exterior não abriu");
         yield return Walk(m.room.transform.position+Vector3.up*1.62f,.28f);
         m.EvaluatePlayer();Require(m.State==ManagerMissionState.Completed,"Sala");Note("2 OK sala");
+        yield return Click("Maçaneta interna");yield return new WaitForSeconds(.8f);
+        Require(Quaternion.Angle(GameObject.Find("Dobradiça da sala").transform.localRotation,Quaternion.identity)<1,"Maçaneta interna não fechou");
+        yield return Click("Maçaneta interna");yield return new WaitForSeconds(.8f);
+        Require(m.day.DoorOpen,"Maçaneta interna não reabriu");Note("Porta abriu, fechou e reabriu depois de concluir a missão");
         yield return Walk(new Vector3(22,1.62f,0),.3f);Note("Escritório até sala de aula a pé");
-        yield return Click("LER O MURAL");yield return Click("ENTENDIDO");
+        yield return Click("LER O MURAL");
+        if(File.Exists("Logs/verificar-menu.request")){
+            Note("Aguardando clique no painel Entendido");while(m.day.Reading)yield return null;
+            Cursor.lockState=CursorLockMode.None; // Return camera control to the automated walk after the UI click.
+        }else yield return Click("ENTENDIDO");
+        Cursor.lockState=CursorLockMode.None;
         Require(!GameObject.Find("ENTENDIDO"),"Mural");Note("3 OK mural");
-        yield return Click("Copo de café");pc.UsePointer(true,false);yield return null;
+        yield return Click("Copo de café");
+        yield return Walk(new Vector3(18.45f,1.01f,-1.85f),1.55f,null,true);
+        pc.UsePointer(true,false);yield return null;yield return null;
         Require(GameObject.FindObjectsByType<TextMesh>(FindObjectsSortMode.None).Any(t=>t.text.Contains("guarde os livros")),"Café");Note("4 OK café");
         foreach(var name in new[]{"Livro","Cadeira","Notebook"}){
             var items=GameObject.FindObjectsByType<Rigidbody>(FindObjectsSortMode.None).Where(b=>b.name==name).OrderBy(b=>b.position.x).ToArray();
@@ -111,12 +131,13 @@ internal static class DesktopWalkCheck
         m.playerHead.LookAt(new Vector3(45,.26f,3.4f));
         pc.UsePointer(false,false);
         yield return new WaitForFixedUpdate();
-        pc.UsePointer(false,true);
+        pc.UsePointer(true,false);
         Note("Lançamento "+ball.position+" velocidade "+ball.linearVelocity);
         yield return new WaitForSeconds(3);
         var pins=UnityEngine.Object.FindObjectsByType<Rigidbody>(FindObjectsSortMode.None)
             .Where(b=>b.name=="Pino").Count(b=>Vector3.Angle(b.transform.up,Vector3.up)>35);
         Require(pins>0,"Bola não derrubou pinos, posição "+ball.position);
+        Require(UnityEngine.Object.FindObjectsByType<TextMesh>(FindObjectsSortMode.None).Any(t=>t.text=="BOLICHE   •   "+pins+" / 10"),"Placar de boliche incorreto");
         Note("Boliche: "+pins+" pinos derrubados");
         yield return Click("Arco arcade");
         var target=GameObject.Find("Alvo luminoso").transform;
@@ -125,9 +146,11 @@ internal static class DesktopWalkCheck
         yield return new WaitForFixedUpdate();
         pc.UsePointer(false,true);
         yield return new WaitForSeconds(2);
+        Require(GameObject.Find("Arco recurvo").transform.Find("Flecha de luz"),"Flecha não recarregou");
         Require(UnityEngine.Object.FindObjectsByType<TextMesh>(FindObjectsSortMode.None).Any(t=>t.text.StartsWith("ARCO ARCADE • 1 ponto")),"Alvo não pontuou");
         Note("Arco: acerto confirmado, 1 ponto");
         yield return Click("REARMAR BOLICHE");
+        yield return new WaitForSeconds(2);
         Require(Vector3.Distance(ball.position,new Vector3(45,.85f,-3.8f))<.18f,"Rearme da bola");
         Require(UnityEngine.Object.FindObjectsByType<Rigidbody>(FindObjectsSortMode.None).Where(b=>b.name=="Pino").All(b=>Vector3.Angle(b.rotation*Vector3.up,Vector3.up)<10),"Rearme dos pinos");
         ball.position=new Vector3(46.24f,.44f,1);ball.linearVelocity=Vector3.zero;ball.WakeUp();
@@ -135,7 +158,12 @@ internal static class DesktopWalkCheck
         Require(ball.position.y<.18f && ball.position.y>-.16f,"Calha "+ball.position);Note("Calha e botão de rearme OK");
         yield return Click("REARMAR BOLICHE");
         yield return Click("VOLTAR À ALA");Require(body.transform.position.x<30,"Voltar à ala");
-        yield return Click("VOLTAR À RECEPÇÃO");Require(body.transform.position.x<10,"Voltar à recepção");
+        if(File.Exists("Logs/verificar-menu.request")){
+            File.Delete("Logs/verificar-menu.request");
+            Cursor.lockState=CursorLockMode.None;
+            Note("Aguardando retorno pelo menu");while(body.transform.position.x>=10)yield return null;
+        }else yield return Click("VOLTAR À RECEPÇÃO");
+        Require(body.transform.position.x<10,"Voltar à recepção");
         yield return Walk(new Vector3(22,1.62f,0),.3f);Note("Escritório até sala de aula a pé");
         yield return Click("SALA DE DESCOMPRESSÃO");Note("Retornos à ala e à recepção OK");
         SessionState.SetBool("WalkCheck.Restart",true);
