@@ -237,7 +237,7 @@ namespace SebraeLab.Missions
             Shape("Teto preto",center,size,navy);
             foreach(float offset in new[]{-.25f,.25f}){
                 var panel=Shape("Luminária",center+new Vector3(offset*size.x,-.14f,0),new Vector3(.84f,.06f,.28f),Color.white);
-                var lamp=panel.AddComponent<Light>();lamp.color=new Color(1,.94f,.84f);lamp.intensity=1.5f;lamp.range=7;
+                var lamp=panel.AddComponent<Light>();lamp.color=new Color(1,.94f,.84f);lamp.intensity=1.5f;lamp.range=7;lamp.renderMode=LightRenderMode.ForceVertex;
             }
         }
         void BuildWing()
@@ -384,7 +384,7 @@ namespace SebraeLab.Missions
                 bounds=meshes[0].bounds;foreach(var mesh in meshes)bounds.Encapsulate(mesh.bounds);
                 lamp.transform.position+=new Vector3(x,3.16f,z)-new Vector3(bounds.center.x,bounds.max.y,bounds.center.z);
                 var light=new GameObject("Luz quente").AddComponent<Light>();light.transform.SetParent(lamp.transform,true);
-                light.transform.position=new Vector3(x,2.9f,z);light.color=new Color(1,.89f,.73f);light.range=5;light.intensity=1.3f;
+                light.transform.position=new Vector3(x,2.9f,z);light.color=new Color(1,.89f,.73f);light.range=5;light.intensity=1.3f;light.renderMode=LightRenderMode.ForceVertex;
             }
             var board=Sign("BOLICHE   •   0 / 10",new Vector3(45,2.2f,5.4f),.12f);
             var pins=new List<Rigidbody>();
