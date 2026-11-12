@@ -24,18 +24,20 @@ namespace SebraeLab.Missions
         GameObject loungeGate, coffeeSpot;
         XRGrabInteractable coffee;
         bool coffeeCollected;
-        string feedback; float feedbackUntil;
-        void Notify(string message){feedback=message;feedbackUntil=Time.unscaledTime+3;}
         readonly Dictionary<GameObject,GameObject> assigned=new Dictionary<GameObject,GameObject>();
         public GameObject Destination(GameObject item) => assigned.TryGetValue(item,out var spot) && spot.activeInHierarchy ? spot : null;
         public bool Reading => confirm && confirm.activeSelf;
         public void ConfirmReading(){if(Reading)UseStation(confirm);}
         public void ReturnToStart(){Move(new Vector3(5.7f,0,7.1f));}
-        int stage, placed, score;
+        int placed, score;
         const int ItemCount = 6;
+        // Etapa atual, objetivo e avisos. Aparece igual na placa de status (Quest) e no HUD do PC.
+        MissionManager etapas;
+        public MissionManager Etapas => etapas;
         public void Initialize(ManagerMission manager)
         {
             mission = manager;
+            if (!TryGetComponent(out etapas)) etapas = gameObject.AddComponent<MissionManager>();
             area = new GameObject("Missão Estágio • percurso").transform;
             Sign("PRIMEIRO DIA\nProcure o gestor do espaço",new Vector3(3.9f,1.9f,7.4f),.067f);
             Music();
@@ -72,7 +74,7 @@ namespace SebraeLab.Missions
             desktopActions[insideHandle]=ToggleDoor;
             entry = Station("ENTRAR NA ALA DE ATIVIDADES",office.TransformPoint(new Vector3(1.85f,1.15f,-3.65f)),()=>Move(new Vector3(24,0,0)));
             entry.SetActive(false);
-            manager.onCompleted.AddListener(()=>{ entry.SetActive(true); stage=1; });
+            manager.onCompleted.AddListener(()=>{ entry.SetActive(true); etapas.Concluir(EtapaExpediente.Sala); });
             gameObject.AddComponent<LabPlaza>().Build();
             AddLitRoof(new Vector3(18,2.78f,0),new Vector3(4,.12f,5.2f));
             AddLitRoof(new Vector3(26,3.23f,0),new Vector3(12,.12f,10));
@@ -81,7 +83,7 @@ namespace SebraeLab.Missions
             BuildLounge();
             loungeGate=Shape("Porta da descompressão",new Vector3(41,1.2f,0),new Vector3(.12f,2.4f,2.4f),teal);
             var gateSign=Sign("DESCOMPRESSÃO   •   ABRE AO CONCLUIR O EXPEDIENTE",new Vector3(40.8f,2.6f,0),.067f);
-            ticks.Add(()=>{if(stage==4)gateSign.text="DESCOMPRESSÃO   •   ENTRADA LIBERADA";});
+            ticks.Add(()=>{if(etapas.Em(EtapaExpediente.Descompressao))gateSign.text="DESCOMPRESSÃO   •   ENTRADA LIBERADA";});
             Station("VOLTAR À RECEPÇÃO",new Vector3(23,1,-4),()=>Move(new Vector3(5.7f,0,7.1f)));
             Station("RECOMEÇAR O DIA",new Vector3(50,1,-6),()=>UnityEngine.SceneManagement.SceneManager.LoadScene(gameObject.scene.name));
         }
@@ -167,32 +169,35 @@ namespace SebraeLab.Missions
             t.fontSize=72;t.characterSize=size*.1f;t.anchor=TextAnchor.MiddleCenter;t.alignment=TextAlignment.Center;t.text=value;
             ticks.Add(()=>{var d=t.transform.position-mission.playerHead.position;d.y=0;if(d.sqrMagnitude>.001f)t.transform.rotation=Quaternion.LookRotation(d);});return t;
         }
+        // Objetos clicáveis no modo PC que não são botões de missão (maçanetas).
         readonly Dictionary<GameObject, Action> desktopActions = new Dictionary<GameObject, Action>();
-        public bool IsStation(GameObject g) => desktopActions.ContainsKey(g);
+        // Botões de missão, pela raiz (que tem o colisor da mira do PC) e pelo painel do mural.
+        readonly Dictionary<GameObject, MissionButton> stations = new Dictionary<GameObject, MissionButton>();
+        public bool IsStation(GameObject g) => g && (stations.ContainsKey(g) || desktopActions.ContainsKey(g));
         public bool UseStation(GameObject station)
         {
+            if (!station) return false;
+            // O botão decide: bloqueado mostra o motivo; liberado põe a ação na fila.
+            if (stations.TryGetValue(station, out var button)) { button.Pressionar(); return true; }
             if (!desktopActions.TryGetValue(station, out var action)) return false;
             pending.Add(action);
             return true;
         }
-        GameObject Station(string caption,Vector3 p,Action action)
+        /// <summary>
+        /// Botão de missão em Canvas World Space. No Quest responde ao raio com o gatilho; no PC, à mira
+        /// com clique ou F. Com etapa, fica cinza antes dela e explica o motivo se apertado.
+        /// </summary>
+        GameObject Station(string caption,Vector3 p,Action action,EtapaExpediente? etapa=null)
         {
-            var button=Shape(caption,p,new Vector3(1.55f,.45f,.22f),navy);
-            var label=Sign(caption,p,.105f);label.color=new Color(.83f,1f,.96f);label.transform.SetParent(button.transform,true);
-            // Face the player with the label on the near face of the panel.
-            label.transform.SetParent(area,true);
+            // A ação entra na fila e roda no Update: evita mexer na cena dentro do evento de UI.
+            var button=MissionButton.Criar(caption,area,p+Vector3.up*.25f,new Vector2(1.1f,.3f),()=>pending.Add(action),etapas,etapa);
+            var root=button.transform.parent.gameObject;
             ticks.Add(()=>{
-                if(!button.activeInHierarchy){label.gameObject.SetActive(false);return;}
-                label.gameObject.SetActive(true);
-                var direction=button.transform.position-mission.playerHead.position;direction.y=0;
-                if(direction.sqrMagnitude<.001f)return;
-                button.transform.rotation=Quaternion.LookRotation(direction);
-                label.transform.SetPositionAndRotation(button.transform.position-button.transform.forward*.12f,button.transform.rotation);
+                var direction=root.transform.position-mission.playerHead.position;direction.y=0;
+                if(direction.sqrMagnitude>.001f)root.transform.rotation=Quaternion.LookRotation(direction);
             });
-            var hitBox = button.GetComponent<BoxCollider>();
-            hitBox.center = new Vector3(0,.25f,0);
-            hitBox.size = new Vector3(1.2f,1.6f,1);
-            desktopActions[button] = action; button.AddComponent<XRSimpleInteractable>().selectEntered.AddListener(e=>pending.Add(action));return button;
+            stations[root]=button;
+            return root;
         }
         void PassageFloor(string name, Vector3 position, Vector3 size)
         {
@@ -244,13 +249,15 @@ namespace SebraeLab.Missions
             Room("Ala de atividades",26,12,10);
             Sign("SALA DE AULA   •   BIBLIOTECA E INFORMÁTICA",new Vector3(28,2.35f,1),.07f);
             Sign("DESCOMPRESSÃO  →",new Vector3(31.9f,2.2f,0),.09f);
-            status=Sign("Visite o Mural do Conhecimento",new Vector3(26,2.6f,0),.105f);
+            status=Sign(etapas.Texto,new Vector3(26,2.6f,0),.105f);
+            etapas.TextoMudou+=texto=>status.text=texto;
             mural=Sign("MURAL DO CONHECIMENTO",new Vector3(22,1.95f,2),.085f);
-            var muralButton=Station("LER O MURAL",new Vector3(22,1,2),()=>{if(stage==0){Notify("Encontre o gerente e entre na Sala 2 antes de ler o mural.");return;}mural.text="SEBRAE LAB\nUm espaço para experimentar ideias,\ntrocar experiências e aprender em grupo.";confirm.SetActive(true);Cursor.lockState=CursorLockMode.None;});
+            // Liberado a partir do Mural: pode ser relido depois, como antes.
+            var muralButton=Station("LER O MURAL",new Vector3(22,1,2),()=>{if(!etapas.Alcancou(EtapaExpediente.Mural))return;mural.text="SEBRAE LAB\nUm espaço para experimentar ideias,\ntrocar experiências e aprender em grupo.";confirm.SetActive(true);Cursor.lockState=CursorLockMode.None;},EtapaExpediente.Mural);
             var panelHit=mural.gameObject.AddComponent<BoxCollider>();
             panelHit.size=new Vector3(2.1f,.8f,.1f);
-            desktopActions[mural.gameObject]=desktopActions[muralButton];
-            confirm=Station("ENTENDIDO",new Vector3(23.8f,1,2),()=>{confirm.SetActive(false);Cursor.lockState=CursorLockMode.Locked;if(stage!=1)return;stage=2;coffee.enabled=true;coffeeSpot.SetActive(true);mural.text="MURAL DO CONHECIMENTO";status.text="Encontre a copa e pegue o café.";});confirm.SetActive(false);
+            stations[mural.gameObject]=stations[muralButton];
+            confirm=Station("ENTENDIDO",new Vector3(23.8f,1,2),()=>{confirm.SetActive(false);Cursor.lockState=CursorLockMode.Locked;if(!etapas.Em(EtapaExpediente.Mural))return;etapas.Concluir(EtapaExpediente.Mural);coffee.enabled=true;coffeeSpot.SetActive(true);mural.text="MURAL DO CONHECIMENTO";});confirm.SetActive(false);
             Shape("Balcão da copa",new Vector3(26,.45f,3),new Vector3(2,.9f,.8f),teal);
             coffee=Grab(Shape("Copo de café",new Vector3(26,1.02f,3),new Vector3(.13f,.1f,.13f),gold,PrimitiveType.Cylinder));
             coffee.enabled=false;
@@ -261,15 +268,15 @@ namespace SebraeLab.Missions
             var coffeeLabel=Sign("CAFÉ   •   ENTREGUE NO PIRES",saucer+Vector3.up*.27f,.065f);
             coffeeLabel.transform.SetParent(coffeeSpot.transform,true);
             coffeeSpot.SetActive(false);
-            coffee.selectEntered.AddListener(e=>{if(stage==2)coffeeCollected=true;});
+            coffee.selectEntered.AddListener(e=>{if(etapas.Em(EtapaExpediente.Cafe))coffeeCollected=true;});
             coffee.selectExited.AddListener(e=>{
-                if(stage!=2 || Vector3.Distance(coffee.GetComponent<Rigidbody>().position,saucer+Vector3.up*.11f)>.35f)return;
+                if(!etapas.Em(EtapaExpediente.Cafe) || Vector3.Distance(coffee.GetComponent<Rigidbody>().position,saucer+Vector3.up*.11f)>.35f)return;
                 pending.Add(()=>{
-                    if(stage!=2)return;
+                    if(!etapas.Em(EtapaExpediente.Cafe))return;
                     coffee.enabled=false;
                     var rb=coffee.GetComponent<Rigidbody>();rb.isKinematic=true;rb.position=saucer+Vector3.up*.11f;
-                    coffeeLabel.gameObject.SetActive(false);stage=3;ShowDeliveryTargets();
-                    status.text="Coworking • guarde os livros nas estantes numeradas.";
+                    coffeeLabel.gameObject.SetActive(false);
+                    etapas.Concluir(EtapaExpediente.Cafe);ShowDeliveryTargets();
                 });
             });
             Sign("COPA   •   RETIRE O CAFÉ",new Vector3(26,1.9f,3),.09f);
@@ -302,19 +309,20 @@ namespace SebraeLab.Missions
         string[] jobs={"Guarde os livros na estante","Alinhe as cadeiras nas marcas","Leve os notebooks às mesas"};
         void ShowDeliveryTargets(){
             for(int kind=0;kind<destinations.Length;kind++)
-                foreach(var spot in destinations[kind]) spot.SetActive(stage==3 && kind==placed/2);
+                foreach(var spot in destinations[kind]) spot.SetActive(etapas.Em(EtapaExpediente.Organizacao) && kind==placed/2);
         }
+        /// <summary>Texto do HUD do modo PC. Avisos vêm do MissionManager, os mesmos da placa do Quest.</summary>
         public string Objective(){
-            if(Time.unscaledTime<feedbackUntil)return feedback;
+            if(etapas.AvisoAtivo)return etapas.Texto;
             switch(mission.State){
                 case ManagerMissionState.FindManager:return "1/5   •   Recepção\nAproxime-se do gerente e pressione F.";
                 case ManagerMissionState.Dialogue:return "1/5   •   Conversa\nPressione F para continuar e aceitar o estágio.";
                 case ManagerMissionState.FindRoom:return DoorOpen?"2/5   •   Sala 2\nAtravesse a porta para conhecer seu escritório.":"2/5   •   Sala 2\nSiga as marcas pela praça e clique na maçaneta.";
             }
-            if(stage==1)return confirm.activeSelf?"3/5   •   Mural\nLeia o painel e clique em Entendido.":"3/5   •   Mural\nAtravesse o escritório e clique em Ler o mural.";
-            if(stage==2 && coffeeCollected)return "4/5   •   Entregue o café na Sala 2\nMire no pires da mesa do escritório e clique para soltar.";
-            if(stage==2)return "4/5   •   Copa\nPegue o copo no balcão com o clique esquerdo.";
-            if(stage==3)return "5/5   •   "+jobs[placed/2]+"   "+(placed%2)+"/2\nPegue o objeto e solte na marca com o mesmo número.";
+            if(etapas.Em(EtapaExpediente.Mural))return confirm.activeSelf?"3/5   •   Mural\nLeia o painel e clique em Entendido.":"3/5   •   Mural\nAtravesse o escritório e clique em Ler o mural.";
+            if(etapas.Em(EtapaExpediente.Cafe) && coffeeCollected)return "4/5   •   Entregue o café na Sala 2\nMire no pires da mesa do escritório e clique para soltar.";
+            if(etapas.Em(EtapaExpediente.Cafe))return "4/5   •   Copa\nPegue o copo no balcão com o clique esquerdo.";
+            if(etapas.Em(EtapaExpediente.Organizacao))return "5/5   •   "+jobs[placed/2]+"   "+(placed%2)+"/2\nPegue o objeto e solte na marca com o mesmo número.";
             return "Expediente concluído\nSiga o corredor até a sala de descompressão.";
         }
         void Delivery(string name,Vector3 p,Vector3 target,Vector3 size,Color color,int kind)
@@ -335,18 +343,24 @@ namespace SebraeLab.Missions
             var deliveryBody = g.GetComponent<Rigidbody>();
             grab.selectExited.AddListener(e=>{
                 var releasePosition = deliveryBody.position;
-                Debug.Log($"Entrega {name}: {releasePosition} -> {target} (etapa {stage})");
+                Debug.Log($"Entrega {name}: {releasePosition} -> {target} (etapa {etapas.Atual})");
                 pending.Add(()=>{
-                if(stage!=3 || delivered || kind!=placed/2)return;
-                var slot=Vector3.Distance(releasePosition,target)<.45f ? marker : null;
-                if(!slot){Notify("Destino de "+itemLabel+": "+destinationLabel.text+". Mire na marca e solte.");return;}
+                if(delivered)return;
+                bool near=Vector3.Distance(releasePosition,target)<.45f;
+                // Fora da etapa ou da ordem: só avisa se o jogador tentou entregar de fato (soltou perto da marca).
+                if(!etapas.Em(EtapaExpediente.Organizacao)){if(near)etapas.Exigir(EtapaExpediente.Organizacao);return;}
+                if(kind!=placed/2){if(near)etapas.Avisar(jobs[placed/2]+" primeiro.");return;}
+                var slot=near ? marker : null;
+                if(!slot){etapas.Avisar("Destino de "+itemLabel+": "+destinationLabel.text+". Mire na marca e solte.");return;}
                 delivered=true;tag.gameObject.SetActive(false);
                 deliveryBody.isKinematic=true;
                 grab.enabled=false;
                 g.transform.SetPositionAndRotation(slot.transform.position+Vector3.up*(size.y/2),Quaternion.identity);
                 destinations[kind].Remove(slot);slot.SetActive(false);
-                placed++;ShowDeliveryTargets();status.text="Organização • "+placed+" de "+ItemCount+" itens";
-                if(placed==ItemCount){stage=4;loungeGate.SetActive(false);status.text="EXPEDIENTE CONCLUÍDO\nEntre na sala de descompressão.";lounge.SetActive(true);}
+                placed++;
+                if(placed==ItemCount){etapas.Concluir(EtapaExpediente.Organizacao);loungeGate.SetActive(false);lounge.SetActive(true);}
+                else etapas.Progresso("Organização • "+placed+" de "+ItemCount+" itens");
+                ShowDeliveryTargets();
             });});
         }
         void BuildLounge()
