@@ -10,9 +10,8 @@ namespace SebraeLab.Missions
     {
         ManagerMission mission;
         Transform hinge;
-        float doorProgress;
-        bool opening;
-        public bool DoorOpen => hinge && Quaternion.Angle(Quaternion.identity, hinge.localRotation) > 45;
+        HandDoor door;
+        public bool DoorOpen => door && door.IsOpen;
         readonly Color navy = new Color(.04f,.13f,.22f), teal = new Color(.04f,.58f,.59f), gold = new Color(1,.68f,.14f);
         readonly MissionSurfaces surfaces = new MissionSurfaces();
         readonly List<Action> ticks = new List<Action>();
@@ -42,6 +41,7 @@ namespace SebraeLab.Missions
             Sign("PRIMEIRO DIA\nProcure o gestor do espaço",new Vector3(3.9f,1.9f,7.4f),.067f);
             Music();
             hinge = new GameObject("Dobradiça da sala").transform;
+            door = hinge.gameObject.AddComponent<HandDoor>();
             var office = new GameObject("Sala do estagiário").transform;
             office.SetParent(area,false);
             office.SetPositionAndRotation(new Vector3(16,0,0), Quaternion.Euler(0,-90,0));
@@ -65,11 +65,11 @@ namespace SebraeLab.Missions
             foreach(float x in new[]{-.055f,1.17f})
                 Shape("Batente",hinge.localPosition+new Vector3(x,1.09f,0),new Vector3(.10f,2.18f,.15f),navy,parent:office);
             Shape("Batente",hinge.localPosition+new Vector3(.56f,2.14f,0),new Vector3(1.32f,.11f,.15f),navy,parent:office);
-            var door = Shape("Porta • sala do estagiário", new Vector3(.56f,1.04f,0),new Vector3(1.12f,2.08f,.07f),teal,parent:hinge);
+            var doorPanel = Shape("Porta • sala do estagiário", new Vector3(.56f,1.04f,0),new Vector3(1.12f,2.08f,.07f),teal,parent:hinge);
             var knob = Shape("Maçaneta",new Vector3(.99f,1,.12f),new Vector3(.22f,.09f,.17f),gold,parent:hinge);
             var insideHandle=Shape("Maçaneta interna",new Vector3(0,0,-1.42f),Vector3.one,gold,parent:knob.transform);
             var grip = knob.AddComponent<XRSimpleInteractable>();
-            grip.selectEntered.AddListener(e => ToggleDoor());
+            door.Bind(grip);
             desktopActions[knob]=ToggleDoor;
             desktopActions[insideHandle]=ToggleDoor;
             entry = Station("ENTRAR NA ALA DE ATIVIDADES",office.TransformPoint(new Vector3(1.85f,1.15f,-3.65f)),()=>Move(new Vector3(24,0,0)));
@@ -122,7 +122,7 @@ namespace SebraeLab.Missions
         }
         public string RoomHint()
         {
-            if (Near(hinge.TransformPoint(new Vector3(.99f,1,0)))) return opening?"[F] Fechar a porta":"[F] Abrir a porta";
+            if (Near(hinge.TransformPoint(new Vector3(.99f,1,0)))) return door.IsOpen?"[F] Fechar a porta":"[F] Abrir a porta";
             if (mission.State==ManagerMissionState.FindRoom)
                 return DoorOpen?"Atravesse a porta e entre na sala.":Near(hinge.TransformPoint(new Vector3(.99f,1,.12f)))?"[F] Abrir a porta":"Siga as marcas azuis até a porta da sala.";
             return entry.activeSelf && Near(entry.transform.position)?"[F] Entrar na ala de atividades":null;
@@ -132,15 +132,10 @@ namespace SebraeLab.Missions
             if(Near(hinge.TransformPoint(new Vector3(.99f,1,0)))) ToggleDoor();
             else if(entry.activeSelf && Near(entry.transform.position)) Move(new Vector3(24,0,0));
         }
-        void ToggleDoor() { opening = !opening; }
+        void ToggleDoor() => door.Toggle();
         void Update()
         {
-            float target=opening?1f:0f;
             if(mission.playerRoot.position.y < -2f) Move(new Vector3(5.7f,.05f,7.1f));
-            if (doorProgress!=target){
-                doorProgress=Mathf.MoveTowards(doorProgress,target,Time.deltaTime/.65f);
-                hinge.localRotation=Quaternion.Euler(0,Mathf.SmoothStep(0,95,doorProgress),0);
-            }
             foreach(var action in ticks) action();
             foreach(var action in pending) action();
             pending.Clear();
