@@ -30,8 +30,10 @@ namespace SebraeLab.Missions
         public ArcheryArrow UltimaFlecha { get; private set; }
         public int Disparos { get; private set; }
         public ArcheryString Corda { get; private set; }
-        /// <summary>Verdadeiro enquanto alguma mão (ou o modo PC) segura o arco. Passar de uma mão para a outra não solta.</summary>
+        /// <summary>Verdadeiro enquanto o arco está seguro, por um controle de VR ou pelo modo PC.</summary>
         public bool ArcoNaMao { get; private set; }
+        /// <summary>Verdadeiro enquanto um controle de VR segura o arco. O modo PC pega o arco sem interactor.</summary>
+        public bool ArcoComControle { get; private set; }
 
         /// <summary>Uma flecha nova foi montada sobre a corda.</summary>
         public event Action FlechaMontada;
@@ -77,7 +79,8 @@ namespace SebraeLab.Missions
             flecha.transform.SetParent(Area, true);
             var voo = flecha.AddComponent<ArcheryArrow>();
             UltimaFlecha = voo;
-            voo.Lancar(flecha.transform.forward * velocidade, Alvo, Arco.transform, tempoMaximoNoAr, tempoCravada, AoAcertar, AoErrar);
+            voo.Lancar(flecha.transform.forward * velocidade, Alvo, Arco.transform, Corda ? Corda.Pegador.transform : null,
+                tempoMaximoNoAr, tempoCravada, AoAcertar, AoErrar);
         }
 
         void Update()
@@ -97,13 +100,20 @@ namespace SebraeLab.Missions
             Disparar(velocidadeDoPc);
         }
 
-        void AoPegarArco(SelectEnterEventArgs args) => ArcoNaMao = true;
+        void AoPegarArco(SelectEnterEventArgs args)
+        {
+            ArcoNaMao = true;
+            ArcoComControle = args != null && args.interactorObject != null; // args é nulo no modo PC
+        }
 
         void AoSoltarArco(SelectExitEventArgs args)
         {
-            // Passar o arco de uma mão para a outra não é soltar. args pode ser nulo (modo PC).
+            // Com o selectMode padrão (Single), o XRI tira o arco da primeira mão antes de entregá-lo à segunda:
+            // numa troca de mão, ArcoSolto dispara e AoPegarArco volta a marcar o arco como seguro na mesma chamada.
+            // O retorno abaixo só vale se o arco aceitar duas mãos (selectMode Multiple). args pode ser nulo (modo PC).
             if (Arco.isSelected) return;
             ArcoNaMao = false;
+            ArcoComControle = false;
             ArcoSolto?.Invoke();
         }
 

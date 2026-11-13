@@ -62,13 +62,13 @@ Recebe do `InternshipDay` o arco (`XRGrabInteractable`), o visual do arco recurv
 3. **Disparo.** `Disparar(float velocidade)` solta a flecha carregada na direção +Z do arco, com `ArcheryArrow`, e conta o tiro. O resultado do voo atualiza o placar.
 4. **Disparo do PC.** Escuta `activated` do arco. Com argumento nulo (o caso do `DesktopPlayer`), coloca a flecha 0,38 m à frente do arco e dispara a 40 m/s. Com argumento de verdade (gatilho do Quest), ignora, para a flecha só sair pela corda.
 5. **Recarga.** 0,35 s depois de cada disparo, uma flecha nova é montada (mantém o `ArcadeArrow` do `InternshipDay`).
-6. **Estado do arco.** Expõe se o arco está na mão (`ArcoNaMao`, pelos eventos `selectEntered` e `selectExited`, sem contar a troca de mão) e cria o `ArcheryString`.
+6. **Estado do arco.** Expõe se o arco está seguro (`ArcoNaMao`, pelos eventos `selectEntered` e `selectExited`) e se quem o segura é um controle de VR (`ArcoComControle`; o modo PC pega o arco sem interactor), e cria o `ArcheryString`. Na troca de mão o XRI solta o arco da primeira mão antes de entregá-lo à segunda, então `ArcoSolto` dispara e o arco volta a contar como seguro na mesma chamada.
 
 ### `ArcheryString` (componente)
 
 Cuida da corda e do pegador, criado pelo `ArcheryRange`:
 
-1. **Pegador.** `GameObject` pequeno com `Rigidbody` cinemático, colisor esférico em trigger (0,07 m) e `XRGrabInteractable`, no ponto de repouso da corda (z -0,12 do visual do arco). O colisor só fica ligado enquanto o arco está na mão. Se o arco for solto durante a puxada, a seleção do pegador é cancelada e nenhum tiro sai.
+1. **Pegador.** `GameObject` pequeno com `Rigidbody` cinemático, colisor esférico sólido (0,07 m) e `XRGrabInteractable`, no ponto de repouso da corda (z -0,12 do visual do arco). O colisor é sólido porque os casters do `NearFarInteractor` do rig (Starter Assets) ignoram triggers. Para não interferir na física, o pegador não tem contato com o arco nem com o `CharacterController` do jogador (`Physics.IgnoreCollision`), e a flecha em voo passa por ele. O colisor só fica ligado enquanto um controle de VR segura o arco; no modo PC fica desligado. Se o arco for solto durante a puxada, a seleção do pegador é cancelada e nenhum tiro sai.
 2. **Puxada.** A cada quadro (e antes de renderizar, porque o XRI move o pegador na própria atualização), com o pegador agarrado, projeta a posição dele no eixo do arco (para trás), limita a 0,50 m com `ArcheryDraw.Limitar` e descarta o desvio lateral. A flecha carregada e a corda visual acompanham o pegador. A corda visual passa a ser dois segmentos, das pontas das lâminas (y ±0,77) até o pegador, e no repouso coincide com a corda reta de hoje.
 3. **Disparo.** Ao soltar o pegador com o arco na mão, se `ArcheryDraw.Dispara` for verdadeiro, chama `ArcheryRange.Disparar` com `ArcheryDraw.Velocidade`, e as duas mãos recebem vibração curta (`HapticImpulsePlayer` acima de cada interactor). Abaixo de 0,10 m não há tiro e a flecha volta ao repouso.
 
@@ -77,7 +77,7 @@ Cuida da corda e do pegador, criado pelo `ArcheryRange`:
 A gravidade e o movimento são calculados pelo componente, sem `Rigidbody` dinâmico. A 40 m/s a flecha anda 0,8 m por passo de física, e o alvo tem 15 cm de espessura, então a colisão por evento pode ser perdida. A cada quadro (`Update`, em passos de no máximo 1/60 s, para o voo ficar fluido no headset):
 
 - soma `Physics.gravity * passo` à velocidade e avança a ponta;
-- lança um raio da ponta anterior até a nova, ignorando triggers, o `CharacterController` do jogador e as peças do próprio arco;
+- lança um raio da ponta anterior até a nova, ignorando triggers, o `CharacterController` do jogador, as peças do próprio arco e o pegador da corda;
 - gira a flecha para a direção da velocidade.
 
 Ao acertar o alvo, calcula a distância do ponto de impacto ao centro no plano do alvo, chama `ArcheryScore.Registrar` (pelo `ArcheryRange`) e crava a flecha (parada) por 4 s. Ao acertar qualquer outra coisa, ou depois de 5 s no ar, conta `Errou`. Um tiro registra uma única vez.
@@ -113,7 +113,8 @@ A conferência do texto antigo ("ARCO ARCADE • 1 ponto") passa a ler o placar 
   - puxada de 0,05 m: nenhum tiro sai e a flecha continua no repouso;
   - puxada mínima de 0,10 m (15 m/s): a flecha passa por baixo do alvo e o último tiro é `Errou`;
   - puxada de 0,30 m: velocidade de 27,5 m/s;
-  - soltar o arco no meio da puxada: sem tiro, pegador e corda de volta ao repouso.
+  - soltar o arco no meio da puxada: sem tiro, pegador e corda de volta ao repouso;
+  - com um controle segurando o arco, a consulta do caster de perto do rig (esfera de 0,1 m, camada Default, ignorando triggers) acha o pegador; sem o arco na mão ou com o arco pego pelo modo PC, não acha; o pegador não tem contato físico com o arco nem com o jogador.
 - Continuam passando: `DesktopWalkCheck` (com o placar novo), `BowlingCheck`, `BowlingRoundCheck`, `NavigationCheck` e `HandDoorCheck`. APK gerado ao final.
 
 O editor não prova o gesto de puxar a corda com a mão no Quest. Isso entra no teste no headset.
@@ -127,4 +128,5 @@ Som, retículo de mira, rodadas de flechas, animação do arco recurvo envergand
 - `InternshipDay` continua sendo editado pelo Richardson. A mudança nele se limita a ligações em `BuildLounge`, mais o texto da placa.
 - `MissionSurfaces` muda uma escala (face do alvo de 0,98 para 1) e `Alvo.png` é regenerado. O Richardson precisa saber, porque o PNG é um binário.
 - O pegador só ser agarrável com o arco na mão depende de eventos do XRI. O interactor de teste no XRI 3.0.11 é inativo e só serve de "quem soltou", como no `BowlingCheck` da Etapa 3. O comportamento real do XRI ao mover o pegador (e o jitter entre a atualização do XRI e a do `ArcheryString`) só aparece no Quest.
+- Com o pegador sólido, o raio de longe do `NearFarInteractor` também pode agarrá-lo à distância. Esse efeito, a troca de mão do arco e a mão livre pegar o arco em vez da corda ficam para o teste no Quest.
 - O raio por passo cobre o atravessamento, mas flechas muito rápidas encostando na borda do alvo podem dar um ponto de impacto na quina e cair no anel de fora. A caixa de 15 cm de espessura reduz esse efeito.

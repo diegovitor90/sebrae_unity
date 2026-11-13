@@ -22,16 +22,17 @@ namespace SebraeLab.Missions
         public float DistanciaDoCentro { get; private set; } = -1f;
         public float TempoNoAr { get; private set; }
 
-        Transform alvo, arco;
+        Transform alvo, arco, pegador;
         float tempoMaximo, cravadaPor;
         Action<float> acertou;
         Action errou;
 
-        public void Lancar(Vector3 velocidade, Transform alvoDoTiro, Transform arcoDoTiro, float tempoMaximoNoAr, float cravadaPorSegundos,
-            Action<float> aoAcertarAlvo, Action aoErrar)
+        public void Lancar(Vector3 velocidade, Transform alvoDoTiro, Transform arcoDoTiro, Transform pegadorDaCorda, float tempoMaximoNoAr,
+            float cravadaPorSegundos, Action<float> aoAcertarAlvo, Action aoErrar)
         {
             alvo = alvoDoTiro;
             arco = arcoDoTiro;
+            pegador = pegadorDaCorda;
             tempoMaximo = tempoMaximoNoAr;
             cravadaPor = cravadaPorSegundos;
             acertou = aoAcertarAlvo;
@@ -77,8 +78,10 @@ namespace SebraeLab.Missions
             if (TempoNoAr > tempoMaximo || Ponta.y < -5f) Parar(Ponta, null);
         }
 
+        // O pegador da corda é sólido só para a mão encontrá-lo; a flecha passa por ele.
         bool Ignorado(Collider colisor) =>
-            colisor is CharacterController || colisor.transform.IsChildOf(transform) || (arco && colisor.transform.IsChildOf(arco));
+            colisor is CharacterController || colisor.transform.IsChildOf(transform) || (arco && colisor.transform.IsChildOf(arco))
+            || (pegador && colisor.transform.IsChildOf(pegador));
 
         void Parar(Vector3 ponto, Collider colisor)
         {

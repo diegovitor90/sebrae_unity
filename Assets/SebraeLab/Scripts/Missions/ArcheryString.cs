@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.XR.Interaction.Toolkit;
 using UnityEngine.XR.Interaction.Toolkit.Inputs.Haptics;
@@ -8,7 +9,9 @@ namespace SebraeLab.Missions
 {
     /// <summary>
     /// Corda do arco. Um pegador (XRGrabInteractable pequeno e cinemático) fica no ponto de repouso da corda e só
-    /// pode ser agarrado com o arco na mão. A mão livre puxa o pegador para trás, a flecha e a corda visual
+    /// pode ser agarrado com um controle de VR segurando o arco (o colisor fica desligado no modo PC). O colisor é
+    /// sólido, porque os casters do NearFarInteractor ignoram triggers, mas sem contato físico com o arco nem com o
+    /// jogador (<see cref="Physics.IgnoreCollision"/>). A mão livre puxa o pegador para trás, a flecha e a corda visual
     /// acompanham, e soltar dispara se a puxada passar do mínimo (<see cref="ArcheryDraw"/>).
     /// </summary>
     public class ArcheryString : MonoBehaviour
@@ -35,6 +38,7 @@ namespace SebraeLab.Missions
         Transform visual;
         Rigidbody corpo;
         Collider colisor;
+        readonly List<Collider> semContato = new List<Collider>();
         Vector3 flechaEmRepouso;
 
         public void Configurar(ArcheryRange dono)
@@ -55,9 +59,14 @@ namespace SebraeLab.Missions
             corpo.useGravity = false;
             var esfera = objeto.AddComponent<SphereCollider>();
             esfera.radius = raioDoPegador;
-            esfera.isTrigger = true; // a flecha varre só colisores sólidos
-            esfera.enabled = false;  // ligado só enquanto o arco está na mão (ver Update)
+            // Sólido: os casters do NearFarInteractor do rig ignoram triggers (Physics Trigger Interaction = Ignore),
+            // e um pegador em trigger nunca seria encontrado pela mão no Quest.
+            esfera.isTrigger = false;
+            esfera.enabled = false; // ligado só enquanto um controle segura o arco (ver Update)
             colisor = esfera;
+            // O pegador existe para a mão achá-lo, não para a física: sem contato com o arco nem com o jogador.
+            semContato.AddRange(dono.Arco.GetComponents<Collider>());
+            semContato.AddRange(FindObjectsByType<CharacterController>(FindObjectsInactive.Include, FindObjectsSortMode.None));
             Pegador = objeto.AddComponent<XRGrabInteractable>();
             Pegador.movementType = XRBaseInteractable.MovementType.Instantaneous;
             Pegador.trackRotation = false;
@@ -75,7 +84,15 @@ namespace SebraeLab.Missions
 
         void Update()
         {
-            if (colisor) colisor.enabled = alcance.ArcoNaMao;
+            if (!colisor) return;
+            bool ligado = alcance.ArcoComControle;
+            if (colisor.enabled != ligado) colisor.enabled = ligado;
+            if (!ligado) return;
+            // O estado de IgnoreCollision pode se perder quando um colisor é desligado e religado (o InternshipDay.Move
+            // religa o CharacterController do jogador), por isso é conferido a cada quadro com o pegador ligado.
+            foreach (var outro in semContato)
+                if (outro && outro.enabled && outro.gameObject.activeInHierarchy && !Physics.GetIgnoreCollision(colisor, outro))
+                    Physics.IgnoreCollision(colisor, outro, true);
         }
 
         float Medir() => ArcheryDraw.Limitar(Vector3.Dot(Pegador.transform.position - PosicaoDeRepouso, -visual.forward));

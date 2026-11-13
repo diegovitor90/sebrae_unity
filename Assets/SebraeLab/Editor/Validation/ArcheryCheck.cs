@@ -180,11 +180,26 @@ namespace SebraeLab.Editor
             var maoDaCorda = Mao("corda");
             var colisor = corda.Pegador.GetComponent<Collider>();
             yield return null;
-            r.Check(!colisor.enabled, "pegador sem colisor enquanto o arco não está na mão");
+            r.Check(!AMaoAcha(corda, colisor), "a mão não acha o pegador enquanto o arco não está na mão");
+
+            // Modo PC: o DesktopPlayer pega o arco sem interactor e não usa a corda.
+            a.Arco.selectEntered.Invoke(null);
+            yield return null;
+            yield return null;
+            r.Check(a.ArcoNaMao && !a.ArcoComControle && !AMaoAcha(corda, colisor), "arco pego pelo modo PC: o pegador continua fora do alcance da mão");
+            a.Arco.selectExited.Invoke(null);
+            yield return null;
+            r.Check(!a.ArcoNaMao, "arco solto pelo modo PC");
+
             a.Arco.selectEntered.Invoke(Entrar(maoDoArco, a.Arco));
             yield return null;
             yield return null;
-            r.Check(colisor.enabled && colisor.isTrigger, "pegador agarrável (trigger) com o arco na mão");
+            r.Check(a.ArcoComControle && AMaoAcha(corda, colisor), "com um controle segurando o arco, a mão acha o pegador (consulta igual à do NearFarInteractor)");
+            r.Check(!colisor.isTrigger, "o colisor do pegador é sólido (os casters do rig ignoram triggers)");
+            var colisoresDoArco = a.Arco.GetComponents<Collider>().Where(c => c.enabled).ToList();
+            r.Check(colisoresDoArco.Count > 0 && colisoresDoArco.All(c => Physics.GetIgnoreCollision(colisor, c)), $"pegador sem contato físico com o arco ({colisoresDoArco.Count} colisor)");
+            var jogador = Object.FindFirstObjectByType<ManagerMission>().playerRoot.GetComponent<CharacterController>();
+            r.Check(jogador && jogador.enabled && Physics.GetIgnoreCollision(colisor, jogador), "pegador sem contato físico com o jogador");
 
             float zRepouso = a.FlechaCarregada.transform.localPosition.z;
             corda.Pegador.selectEntered.Invoke(Entrar(maoDaCorda, corda.Pegador));
@@ -212,7 +227,7 @@ namespace SebraeLab.Editor
             r.Check(corda.Puxada == 0f && !corda.PegadorAgarrado && Vector3.Distance(corda.Pegador.transform.position, corda.PosicaoDeRepouso) < .005f, "pegador de volta ao repouso");
             a.Arco.selectExited.Invoke(Sair(maoDoArco, a.Arco));
             yield return AguardarFlecha(a);
-            r.Check(!colisor.enabled, "pegador sem colisor de novo depois de soltar o arco");
+            r.Check(!AMaoAcha(corda, colisor), "a mão deixa de achar o pegador depois de soltar o arco");
         }
 
         static IEnumerator PuxadaFraca(ArcheryRange a, Relatorio r)
@@ -348,6 +363,16 @@ namespace SebraeLab.Editor
         {
             for (float t = 0; t < 2f && !a.FlechaCarregada; t += Time.deltaTime) yield return null;
             yield return null;
+        }
+
+        /// <summary>
+        /// Repete a consulta do caster de perto do NearFarInteractor do rig (Starter Assets): esfera de 0,1 m,
+        /// só a camada Default, ignorando triggers. Um pegador em trigger ou desligado não aparece aqui.
+        /// </summary>
+        static bool AMaoAcha(ArcheryString corda, Collider colisor)
+        {
+            Physics.SyncTransforms();
+            return Physics.OverlapSphere(corda.PosicaoDeRepouso, .1f, 1, QueryTriggerInteraction.Ignore).Contains(colisor);
         }
 
         /// <summary>Mão de teste: objeto inativo, o interactor não acorda nem tenta selecionar nada.</summary>
