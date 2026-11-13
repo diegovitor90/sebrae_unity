@@ -29,6 +29,7 @@ namespace SebraeLab.Missions
         public GameObject FlechaCarregada { get; private set; }
         public ArcheryArrow UltimaFlecha { get; private set; }
         public int Disparos { get; private set; }
+        public ArcheryString Corda { get; private set; }
         /// <summary>Verdadeiro enquanto alguma mão (ou o modo PC) segura o arco. Passar de uma mão para a outra não solta.</summary>
         public bool ArcoNaMao { get; private set; }
 
@@ -59,6 +60,10 @@ namespace SebraeLab.Missions
             arco.selectEntered.AddListener(AoPegarArco);
             arco.selectExited.AddListener(AoSoltarArco);
             AtualizarPlacar();
+
+            // A corda precisa da flecha carregada, que já existe aqui.
+            Corda = gameObject.AddComponent<ArcheryString>();
+            Corda.Configurar(this);
         }
 
         /// <summary>Solta a flecha carregada na direção +Z do arco, na pose em que ela está.</summary>

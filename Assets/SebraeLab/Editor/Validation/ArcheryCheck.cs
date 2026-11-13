@@ -71,7 +71,8 @@ namespace SebraeLab.Editor
             {
                 Montagem(alcance, r);
                 // Passos executados no mesmo iterador: uma exceção chega ao finally e o relatório sai mesmo assim.
-                foreach (var passo in new Func<ArcheryRange, Relatorio, IEnumerator>[] { DisparoDoPc, Recarga, GatilhoDoQuest, TiroNoChao })
+                foreach (var passo in new Func<ArcheryRange, Relatorio, IEnumerator>[] { DisparoDoPc, Recarga, GatilhoDoQuest, TiroNoChao,
+                    PuxadaMaxima, PuxadaFraca, PuxadaMinima, PuxadaMedia, SoltarOArco })
                 {
                     var e = passo(alcance, r);
                     while (e.MoveNext()) yield return e.Current;
@@ -164,6 +165,163 @@ namespace SebraeLab.Editor
             r.Check(a.Placar.Total == antes && a.Placar.UltimoRotulo == "Errou", $"conta Errou sem mexer no total ({a.Placar.UltimoRotulo}, total {a.Placar.Total}, antes {antes})");
             r.Check(a.Texto.text.Contains("Último tiro: Errou"), $"placar mostra o erro: \"{a.Texto.text.Replace("\n", " | ")}\"");
             yield return AguardarFlecha(a);
+        }
+
+        static IEnumerator PuxadaMaxima(ArcheryRange a, Relatorio r)
+        {
+            r.Secao("Puxada máxima");
+            var centro = a.Alvo.position;
+            Mirar(a, PosicaoDoArco, centro);
+            yield return AguardarFlecha(a);
+            var corda = a.Corda;
+            r.Check(corda != null && corda.Pegador, "o arco tem corda com pegador");
+            if (corda == null || !corda.Pegador) yield break;
+            var maoDoArco = Mao("arco");
+            var maoDaCorda = Mao("corda");
+            var colisor = corda.Pegador.GetComponent<Collider>();
+            yield return null;
+            r.Check(!colisor.enabled, "pegador sem colisor enquanto o arco não está na mão");
+            a.Arco.selectEntered.Invoke(Entrar(maoDoArco, a.Arco));
+            yield return null;
+            yield return null;
+            r.Check(colisor.enabled && colisor.isTrigger, "pegador agarrável (trigger) com o arco na mão");
+
+            float zRepouso = a.FlechaCarregada.transform.localPosition.z;
+            corda.Pegador.selectEntered.Invoke(Entrar(maoDaCorda, corda.Pegador));
+            corda.Pegador.transform.position = corda.PosicaoDeRepouso - a.Visual.forward * .8f; // além do limite
+            yield return null;
+            yield return null;
+            r.Check(corda.PegadorAgarrado, "pegador agarrado");
+            r.Check(Mathf.Abs(corda.Puxada - ArcheryDraw.PuxadaMaxima) < .005f, $"puxada limitada a 0,50 m (puxou 0,80): {corda.Puxada:0.###} m");
+            r.Check(Mathf.Abs(a.FlechaCarregada.transform.localPosition.z - (zRepouso - ArcheryDraw.PuxadaMaxima)) < .01f, "a flecha recuou 0,50 m junto com a corda");
+            float esperado = Vector3.Distance(new Vector3(0f, .77f, -.12f), new Vector3(0f, 0f, -.12f - ArcheryDraw.PuxadaMaxima));
+            r.Check(Mathf.Abs(corda.SegmentoSuperior.localScale.y - esperado) < .01f && Mathf.Abs(corda.SegmentoInferior.localScale.y - esperado) < .01f,
+                $"os dois segmentos da corda esticam até o pegador ({corda.SegmentoSuperior.localScale.y:0.###} m, esperado {esperado:0.###})");
+
+            int antes = a.Placar.Total, tiros = a.Disparos;
+            corda.Pegador.selectExited.Invoke(Sair(maoDaCorda, corda.Pegador));
+            yield return AteAcabar(a);
+            var f = a.UltimaFlecha;
+            r.Check(a.Disparos == tiros + 1 && f != null, $"soltar o pegador dispara ({a.Disparos - tiros} tiro)");
+            if (f != null)
+            {
+                r.Check(Mathf.Abs(f.VelocidadeInicial - ArcheryDraw.VelocidadeMaxima) < .05f, $"velocidade {f.VelocidadeInicial:0.##} m/s");
+                r.Check(f.AcertouAlvo && a.Placar.UltimoPontos >= 8 && a.Placar.Total == antes + a.Placar.UltimoPontos,
+                    $"a flecha acertou o alvo pelo anel de 8 ou 10 (ganhou {a.Placar.UltimoPontos}, {a.Placar.UltimoRotulo})");
+            }
+            r.Check(corda.Puxada == 0f && !corda.PegadorAgarrado && Vector3.Distance(corda.Pegador.transform.position, corda.PosicaoDeRepouso) < .005f, "pegador de volta ao repouso");
+            a.Arco.selectExited.Invoke(Sair(maoDoArco, a.Arco));
+            yield return AguardarFlecha(a);
+            r.Check(!colisor.enabled, "pegador sem colisor de novo depois de soltar o arco");
+        }
+
+        static IEnumerator PuxadaFraca(ArcheryRange a, Relatorio r)
+        {
+            r.Secao("Puxada fraca");
+            Mirar(a, PosicaoDoArco, a.Alvo.position);
+            yield return AguardarFlecha(a);
+            var corda = a.Corda;
+            var maoDoArco = Mao("arco");
+            var maoDaCorda = Mao("corda");
+            a.Arco.selectEntered.Invoke(Entrar(maoDoArco, a.Arco));
+            yield return null;
+            var flecha = a.FlechaCarregada;
+            float zRepouso = flecha.transform.localPosition.z;
+            corda.Pegador.selectEntered.Invoke(Entrar(maoDaCorda, corda.Pegador));
+            corda.Pegador.transform.position = corda.PosicaoDeRepouso - a.Visual.forward * .05f;
+            yield return null;
+            yield return null;
+            int tiros = a.Disparos;
+            corda.Pegador.selectExited.Invoke(Sair(maoDaCorda, corda.Pegador));
+            yield return null;
+            r.Check(a.Disparos == tiros, "puxada de 0,05 m não dispara");
+            r.Check(a.FlechaCarregada == flecha && Mathf.Abs(flecha.transform.localPosition.z - zRepouso) < .005f, "a flecha continua carregada, de volta ao repouso");
+            r.Check(corda.Puxada == 0f && !corda.PegadorAgarrado, "pegador solto e sem puxada");
+            a.Arco.selectExited.Invoke(Sair(maoDoArco, a.Arco));
+        }
+
+        static IEnumerator PuxadaMinima(ArcheryRange a, Relatorio r)
+        {
+            r.Secao("Puxada mínima");
+            Mirar(a, PosicaoDoArco, a.Alvo.position);
+            yield return AguardarFlecha(a);
+            var corda = a.Corda;
+            var maoDoArco = Mao("arco");
+            var maoDaCorda = Mao("corda");
+            a.Arco.selectEntered.Invoke(Entrar(maoDoArco, a.Arco));
+            yield return null;
+            corda.Pegador.selectEntered.Invoke(Entrar(maoDaCorda, corda.Pegador));
+            const float puxada = .11f; // um pouco acima do mínimo: 0,10 exato pode medir 0,0999 por arredondamento
+            corda.Pegador.transform.position = corda.PosicaoDeRepouso - a.Visual.forward * puxada;
+            yield return null;
+            yield return null;
+            int antes = a.Placar.Total, tiros = a.Disparos;
+            corda.Pegador.selectExited.Invoke(Sair(maoDaCorda, corda.Pegador));
+            yield return AteAcabar(a);
+            var f = a.UltimaFlecha;
+            r.Check(a.Disparos == tiros + 1 && f != null, "puxada de 0,11 m dispara");
+            if (f != null)
+            {
+                float v = ArcheryDraw.Velocidade(puxada);
+                r.Check(Mathf.Abs(f.VelocidadeInicial - v) < .05f, $"velocidade {f.VelocidadeInicial:0.##} m/s (esperado {v:0.##})");
+                r.Check(!f.AcertouAlvo && a.Placar.UltimoRotulo == "Errou" && a.Placar.Total == antes,
+                    $"a flecha lenta cai antes do alvo e conta Errou ({a.Placar.UltimoRotulo}, total {a.Placar.Total}, antes {antes})");
+            }
+            a.Arco.selectExited.Invoke(Sair(maoDoArco, a.Arco));
+            yield return AguardarFlecha(a);
+        }
+
+        static IEnumerator PuxadaMedia(ArcheryRange a, Relatorio r)
+        {
+            r.Secao("Puxada média");
+            Mirar(a, PosicaoDoArco, a.Alvo.position);
+            yield return AguardarFlecha(a);
+            var corda = a.Corda;
+            var maoDoArco = Mao("arco");
+            var maoDaCorda = Mao("corda");
+            a.Arco.selectEntered.Invoke(Entrar(maoDoArco, a.Arco));
+            yield return null;
+            corda.Pegador.selectEntered.Invoke(Entrar(maoDaCorda, corda.Pegador));
+            corda.Pegador.transform.position = corda.PosicaoDeRepouso - a.Visual.forward * .3f;
+            yield return null;
+            yield return null;
+            int tiros = a.Disparos;
+            corda.Pegador.selectExited.Invoke(Sair(maoDaCorda, corda.Pegador));
+            yield return AteAcabar(a);
+            var f = a.UltimaFlecha;
+            r.Check(a.Disparos == tiros + 1 && f != null, "puxada de 0,30 m dispara");
+            if (f != null) r.Check(Mathf.Abs(f.VelocidadeInicial - 27.5f) < .05f, $"velocidade {f.VelocidadeInicial:0.##} m/s (esperado 27,5)");
+            a.Arco.selectExited.Invoke(Sair(maoDoArco, a.Arco));
+            yield return AguardarFlecha(a);
+        }
+
+        static IEnumerator SoltarOArco(ArcheryRange a, Relatorio r)
+        {
+            r.Secao("Soltar o arco no meio da puxada");
+            Mirar(a, PosicaoDoArco, a.Alvo.position);
+            yield return AguardarFlecha(a);
+            var corda = a.Corda;
+            var maoDoArco = Mao("arco");
+            var maoDaCorda = Mao("corda");
+            a.Arco.selectEntered.Invoke(Entrar(maoDoArco, a.Arco));
+            yield return null;
+            var flecha = a.FlechaCarregada;
+            float zRepouso = flecha.transform.localPosition.z;
+            corda.Pegador.selectEntered.Invoke(Entrar(maoDaCorda, corda.Pegador));
+            corda.Pegador.transform.position = corda.PosicaoDeRepouso - a.Visual.forward * .3f;
+            yield return null;
+            yield return null;
+            r.Check(corda.Puxada > .25f, $"puxando 0,30 m ({corda.Puxada:0.###})");
+            int tiros = a.Disparos;
+            a.Arco.selectExited.Invoke(Sair(maoDoArco, a.Arco)); // arco solto com a corda puxada
+            yield return null;
+            yield return null;
+            r.Check(a.Disparos == tiros, "soltar o arco no meio da puxada não dispara");
+            r.Check(corda.Puxada == 0f && !corda.PegadorAgarrado && Vector3.Distance(corda.Pegador.transform.position, corda.PosicaoDeRepouso) < .005f, "pegador e corda de volta ao repouso");
+            r.Check(a.FlechaCarregada == flecha && Mathf.Abs(flecha.transform.localPosition.z - zRepouso) < .005f, "a flecha voltou ao repouso");
+            corda.Pegador.selectExited.Invoke(Sair(maoDaCorda, corda.Pegador)); // o XRI avisa depois do cancelamento
+            yield return null;
+            r.Check(a.Disparos == tiros, "o aviso tardio de soltura do pegador também não dispara");
         }
 
         // Ajudantes ---------------------------------------------------------------------------------------
