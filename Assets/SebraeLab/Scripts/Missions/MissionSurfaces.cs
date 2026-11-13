@@ -141,7 +141,7 @@ namespace SebraeLab.Missions
                     }
                     finish="Bola";break;
                 case "Alvo luminoso":
-                    var disc=Detail(p,"Face do alvo",Vector3.back*.5f,new Vector3(.98f,.001f,.98f),"Alvo",PrimitiveType.Cylinder);
+                    var disc=Detail(p,"Face do alvo",Vector3.back*.5f,new Vector3(1f,.001f,1f),"Alvo",PrimitiveType.Cylinder);
                     disc.transform.localRotation=Quaternion.Euler(-90,0,0);finish="Borracha";break;
                 case "Porta • sala do estagiário":
                     foreach(float side in new[]{-.5f,.5f}){
