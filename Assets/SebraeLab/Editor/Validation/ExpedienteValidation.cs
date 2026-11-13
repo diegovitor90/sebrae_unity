@@ -147,5 +147,9 @@ public static class ExpedienteValidation {
    File.WriteAllText(Log("recepcao-visual.txt"),"Oito vistas da recepção renderizadas sem área magenta detectada.");
   }finally{RenderTexture.active=previous;probe.targetTexture=null;RenderTexture.ReleaseTemporary(rt);Object.DestroyImmediate(tex);Object.DestroyImmediate(probe.gameObject);}
  }
- static void Press(string name){GameObject.Find(name).GetComponent<XRSimpleInteractable>().selectEntered.Invoke(null);Object.FindFirstObjectByType<InternshipDay>().SendMessage("Update");}
+ static void Press(string name){
+  var station=GameObject.Find(name);if(!station)throw new Exception("Botão não encontrado ou inativo: "+name);
+  var day=Object.FindFirstObjectByType<InternshipDay>();
+  if(!day.UseStation(station))throw new Exception("Não é um botão de missão: "+name);
+  day.SendMessage("Update");}
 }

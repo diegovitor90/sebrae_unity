@@ -6,6 +6,7 @@ namespace SebraeLab.Missions
     {
         Transform plaza;
         Material sky;
+        Texture2D grass;
         MaterialPropertyBlock colors;
 
         GameObject Part(string name, Vector3 position, Vector3 size, Color color, PrimitiveType type = PrimitiveType.Cube)
@@ -30,6 +31,11 @@ namespace SebraeLab.Missions
                 colors.SetTexture("_MainTex", Resources.Load<Texture2D>("Praca/" + (name=="Copa" ? "Folhagem" : "Casca")));
                 color = Color.white;
             }
+            if(name=="Gramado" || name=="Canteiro")
+            {
+                colors.SetTexture("_MainTex",grass);
+                color=Color.white;
+            }
             colors.SetVector("_MainTex_ST", new Vector4(Mathf.Max(1,size.x), Mathf.Max(1,size.z),0,0));
             colors.SetFloat("_Glossiness", .13f);
             colors.SetColor("_Color", color);
@@ -42,12 +48,33 @@ namespace SebraeLab.Missions
             colors = new MaterialPropertyBlock();
             plaza = new GameObject("Praça do Sebrae Lab").transform;
             plaza.SetParent(transform, true);
+            grass=new Texture2D(128,128,TextureFormat.RGB24,true);
+            grass.name="Grama • lâminas e variação de cor";
+            var random=new System.Random(71);
+            var pixels=new Color32[128*128];
+            for(int i=0;i<pixels.Length;i++){
+                int shade=random.Next(38);
+                pixels[i]=new Color32((byte)(66+shade),(byte)(95+shade),(byte)(49+shade/2),255);
+            }
+            for(int i=0;i<1900;i++){
+                int x=random.Next(128),y=random.Next(128);
+                for(int j=0;j<4;j++) pixels[((y+j)%128)*128+(x+j/2)%128]=new Color32(115,141,78,255);
+            }
+            grass.SetPixels32(pixels);grass.Apply(true,true);grass.anisoLevel=8;
+            // Leave the recessed bowling gutters free of terrain.
+            foreach(var rect in new[]{new Rect(-90,-85,131,170),new Rect(55,-85,35,170),
+                new Rect(41,-85,14,77),new Rect(41,8,14,77)})
+                Part("Gramado",new Vector3(rect.center.x,-.19f,rect.center.y),new Vector3(rect.width,.24f,rect.height),Color.white);
+            foreach(int side in new[]{-1,1}){
+                Part("Cerca viva",new Vector3(side*89.7f,.5f,0),new Vector3(.6f,1.15f,170),new Color(.2f,.4f,.19f));
+                Part("Cerca viva",new Vector3(0,.5f,side*84.7f),new Vector3(180,1.15f,.6f),new Color(.2f,.4f,.19f));
+            }
             var lawn = new Color(.32f,.52f,.33f);
             var stone = new Color(.82f,.76f,.64f);
             var wood = new Color(.48f,.28f,.15f);
             var leaf = new Color(.17f,.46f,.32f);
-            Part("Calçada da entrada", new Vector3(0,-.13f,13), new Vector3(30,.24f,12), stone);
-            Part("Alameda central", new Vector3(0,-.11f,20), new Vector3(25,.2f,5), stone);
+            Part("Calçada da entrada", new Vector3(0,-.095f,13), new Vector3(30,.24f,12), stone);
+            Part("Alameda central", new Vector3(0,-.11f,20.75f), new Vector3(25,.2f,3.5f), stone);
             for (int side=-1; side<=1; side+=2)
             {
                 Part("Canteiro", new Vector3(side*8,.05f,15), new Vector3(8,.15f,3.8f), lawn);
@@ -89,6 +116,6 @@ namespace SebraeLab.Missions
                 foreach(var cam in Camera.allCameras) cam.clearFlags=CameraClearFlags.Skybox;
             }
         }
-        void OnDestroy(){if(sky) Destroy(sky);}
+        void OnDestroy(){if(sky) Destroy(sky);if(grass) Destroy(grass);}
     }
 }

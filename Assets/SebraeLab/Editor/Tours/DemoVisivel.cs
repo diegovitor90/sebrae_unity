@@ -100,5 +100,9 @@ public static class DemoVisivel {
  Object.Destroy(head);
  Object.Destroy(controller);
  }
- static void Press(string name){GameObject.Find(name).GetComponent<XRSimpleInteractable>().selectEntered.Invoke(null);Object.FindFirstObjectByType<InternshipDay>().SendMessage("Update");}
+ static void Press(string name){
+  var station=GameObject.Find(name);if(!station)throw new Exception("Botão não encontrado ou inativo: "+name);
+  var day=Object.FindFirstObjectByType<InternshipDay>();
+  if(!day.UseStation(station))throw new Exception("Não é um botão de missão: "+name);
+  day.SendMessage("Update");}
 }

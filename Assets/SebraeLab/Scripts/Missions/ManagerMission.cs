@@ -41,7 +41,10 @@ namespace SebraeLab.Missions
 #if UNITY_EDITOR || UNITY_STANDALONE
             gameObject.AddComponent<DesktopPlayer>().Initialize(this);
 #endif
-            day = gameObject.AddComponent<InternshipDay>(); day.Initialize(this); dialogue[dialogue.Length-1]="Seu escritório fica na galeria ao lado da praça. Siga as marcas até a porta da Sala 2. A sala de aula fica logo depois do escritório."; RestartMission(); }
+            // Retorno de hover e clique no botão do painel. Configurado na cena pelo Inspector, é respeitado.
+            if (conversationButton && !conversationButton.GetComponent<MissionButton>())
+                conversationButton.gameObject.AddComponent<MissionButton>();
+            day =gameObject.AddComponent<InternshipDay>(); day.Initialize(this); dialogue[dialogue.Length-1]="Seu escritório fica na galeria ao lado da praça. Siga as marcas até a porta da Sala 2. A sala de aula fica logo depois do escritório."; RestartMission(); }
         void Update()
         {
 #if UNITY_EDITOR || UNITY_STANDALONE

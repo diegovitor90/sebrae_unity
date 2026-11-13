@@ -51,7 +51,8 @@ namespace SebraeLab.Missions
             if (keys.escapeKey.wasPressedThisFrame) Cursor.lockState = CursorLockMode.None;
             if (Cursor.lockState != CursorLockMode.Locked)
             {
-                if (mouse.leftButton.wasPressedThisFrame) Cursor.lockState = CursorLockMode.Locked;
+                var pointer=mouse.position.ReadValue();
+                if (!mission.day.Reading && mouse.leftButton.wasPressedThisFrame && !MenuRect.Contains(new Vector2(pointer.x,Screen.height-pointer.y))) Cursor.lockState = CursorLockMode.Locked;
                 return;
             }
             var look = mouse.delta.ReadValue() * .12f;
@@ -77,15 +78,20 @@ namespace SebraeLab.Missions
                 heldBody.rotation = Quaternion.Euler(0, head.eulerAngles.y, 0);
                 if (held.name == "Arco arcade")
                 {
-                    heldBody.rotation = head.rotation;
+                    var aimPoint=head.position+head.forward*12;
+                    if(Physics.Raycast(head.position,head.forward,out var aimHit,35f,~0,QueryTriggerInteraction.Ignore))aimPoint=aimHit.point;
+                    var gripPosition=head.position+head.forward*Mathf.Min(reach,.82f)+head.right*.24f-head.up*.22f;
+                    heldBody.position=gripPosition;
+                    heldBody.rotation=Quaternion.LookRotation(aimPoint-gripPosition,head.up);
                     if (secondary) held.activated.Invoke(null);
                 }
                 if (primary || (secondary && held.name != "Arco arcade"))
-                    Release(secondary);
+                    Release(secondary || held.name == "Bola de boliche");
                 return;
             }
             if (!primary || !Physics.Raycast(head.position, head.forward, out var hit, 2.8f, Physics.DefaultRaycastLayers, QueryTriggerInteraction.Ignore)) return;
             var item = hit.collider.GetComponentInParent<XRGrabInteractable>();
+            if (item && !item.isActiveAndEnabled) return;
             if (!item)
             {
                 if (!mission.day.UseStation(hit.collider.gameObject)) mission.Interact();
@@ -109,18 +115,15 @@ namespace SebraeLab.Missions
 
         void Release(bool throwItem)
         {
-            if (!throwItem && (held.name=="Livro" || held.name=="Cadeira" || held.name=="Notebook"))
-            {
-                foreach(var marker in GameObject.FindObjectsByType<MeshRenderer>(FindObjectsSortMode.None))
-                {
-                    if(marker.name!="Destino • "+held.name) continue;
-                    var goal=marker.transform.position+Vector3.up*held.transform.localScale.y*.5f;
-                    var toGoal=goal-head.position;
-                    if(toGoal.magnitude>2.2f || Vector3.Angle(toGoal,head.forward)>10) continue;
-                    if(Physics.Raycast(head.position,toGoal,out var obstruction,toGoal.magnitude,~0,QueryTriggerInteraction.Ignore)
-                        && Vector3.Distance(obstruction.point,goal)>.35f) continue;
-                    heldBody.position=goal;
-                    break;
+            var marker=mission.day.Destination(held.gameObject);
+            if(!throwItem && marker){
+                var goal=marker.transform.position+Vector3.up*(held.name=="Copo de café"?.11f:held.transform.localScale.y*.5f);
+                var delta=goal-head.position;
+                if(delta.magnitude<2.6f && Vector3.Angle(delta,head.forward)<15){
+                    bool clear=true;
+                    foreach(var hit in Physics.RaycastAll(head.position,delta,delta.magnitude,~0,QueryTriggerInteraction.Ignore))
+                        if(hit.collider.name.Contains("Parede") || hit.collider.name.StartsWith("Porta •"))clear=false;
+                    if(clear)heldBody.position=goal;
                 }
             }
             heldBody.detectCollisions = true;
@@ -129,8 +132,13 @@ namespace SebraeLab.Missions
             if (throwItem && held.name == "Bola de boliche")
             {
                 var roll = Vector3.ProjectOnPlane(head.forward, Vector3.up).normalized;
-                if (Physics.Raycast(heldBody.position, Vector3.down, out var floor, 2.5f, ~0, QueryTriggerInteraction.Ignore)
-                    && floor.collider.name == "Pista de boliche")
+                var origin=heldBody.position;
+                if(roll.sqrMagnitude<.01f)roll=body.transform.forward;
+                heldBody.linearVelocity=roll*8f+Vector3.up*1.1f;
+                if(origin.z>=-6f && origin.z< -3.35f && Mathf.Abs(origin.x-45)<1 && roll.z>.3f)
+                    origin.z=-3.35f;
+                if (Physics.Raycast(origin+Vector3.up*.2f,Vector3.down,out var floor,3f,~0,QueryTriggerInteraction.Ignore)
+                    && floor.collider.name=="Pista de boliche")
                 {
                     float radius = held.GetComponent<SphereCollider>().radius * held.transform.lossyScale.x;
                     heldBody.position = floor.point + Vector3.up * (radius + .01f);
@@ -143,11 +151,56 @@ namespace SebraeLab.Missions
             held = null;
         }
 
+        Rect MenuRect {
+            get {
+                float width=Mathf.Min(430,Screen.width-20);
+                return new Rect((Screen.width-width)/2,(Screen.height-210)/2,width,210);
+            }
+        }
+
+        void Menu()
+        {
+            var rect=MenuRect;
+            var saved=GUI.color;
+            GUI.color=new Color(.045f,.12f,.16f,.98f);
+            GUI.DrawTexture(rect,Texture2D.whiteTexture);
+            GUI.color=new Color(.24f,.85f,.72f);
+            GUI.DrawTexture(new Rect(rect.x,rect.y,rect.width,4),Texture2D.whiteTexture);
+            GUI.color=Color.white;
+            GUILayout.BeginArea(new Rect(rect.x+20,rect.y+16,rect.width-40,rect.height-26));
+            bool reading=mission.day.Reading;
+            var title=new GUIStyle(GUI.skin.label){fontSize=21,fontStyle=FontStyle.Bold};
+            var copy=new GUIStyle(GUI.skin.label){fontSize=15,wordWrap=true};
+            GUILayout.Label(reading?"Mural do Conhecimento":"Seu expediente",title);
+            GUILayout.Space(5);
+            GUILayout.Label(reading?"No Sebrae Lab você pode experimentar ideias, trocar experiências e aprender em grupo.":"Volte à recepção a qualquer momento. Seu progresso fica salvo nesta partida.",copy);
+            GUILayout.Space(10);
+            GUI.backgroundColor=new Color(.30f,.85f,.72f);
+            if(GUILayout.Button(reading?"Entendido":"Continuar o expediente",GUILayout.Height(34))){
+                if(reading)mission.day.ConfirmReading();
+                Cursor.lockState=CursorLockMode.Locked;
+            }
+            GUI.backgroundColor=Color.white;
+            if(!reading && GUILayout.Button("Voltar ao início  •  Recepção",GUILayout.Height(32))){
+                if(held)Release(false);
+                mission.day.ReturnToStart();Cursor.lockState=CursorLockMode.Locked;
+            }
+            GUILayout.EndArea();GUI.color=saved;
+        }
         void OnGUI()
         {
+            if(mission && mission.day && Cursor.lockState!=CursorLockMode.Locked)Menu();
+            if(mission && mission.day){
+                float width=Mathf.Min(460,Screen.width-16);
+                GUI.Box(new Rect(8,59,width,50),mission.day.Objective());
+            }
             GUI.Box(new Rect(8, 8, Mathf.Min(440, Screen.width-16), 48),
                 Cursor.lockState != CursorLockMode.Locked ? "Clique para jogar com mouse e teclado" :
                 "WASD andar   •   Mouse olhar   •   F conversar / abrir porta\nClique pegar / soltar / usar   •   Direito lançar / atirar   •   Esc cursor");
+            if (Cursor.lockState==CursorLockMode.Locked && mission && mission.day && head && Physics.Raycast(head.position,head.forward,out var station,3.2f,Physics.DefaultRaycastLayers,QueryTriggerInteraction.Ignore) && mission.day.IsStation(station.collider.gameObject))
+                GUI.Box(new Rect((Screen.width-330)/2,Screen.height*.59f,330,32),"[F]   "+station.collider.name);
+            if(held && (held.name=="Bola de boliche" || held.name=="Arco arcade"))
+                GUI.Box(new Rect((Screen.width-330)/2,Screen.height-100,330,28),held.name=="Bola de boliche"?"Mire nos pinos e clique para arremessar":"Botão direito: disparar flecha");
             if (Cursor.lockState == CursorLockMode.Locked)
                 GUI.Label(new Rect(Screen.width/2-4, Screen.height/2-10, 18, 22), "+");
         }

@@ -95,7 +95,7 @@ namespace SebraeLab.Missions
         {
             var renderer=obj.GetComponent<MeshRenderer>();
             var p=obj.transform;
-            string finish="Sinal";
+            string finish="Carvalho";
             if(name.StartsWith("Volume ")){
                 int index=int.Parse(name.Substring(7))%6;
                 Book(p,"Volume"+index,"Lombo"+index);renderer.sharedMaterial=Get("Paginas");return;
@@ -110,9 +110,12 @@ namespace SebraeLab.Missions
                     obj.GetComponent<MeshFilter>().sharedMesh=cupMesh;
                     Detail(p,"Café e crema",new Vector3(0,.91f,0),new Vector3(.94f,.024f,.94f),"Cafe",PrimitiveType.Cylinder);
                     finish="Copo";break;
+                case "Luminária":case "Pé de aço":finish="Aco";break;
                 case "Mesa do escritório":case "Mesa de inovação":case "Mesa de coworking":case "Mesa da sala de aula":Table(obj,"Carvalho");return;
                 case "Balcão da copa":
-                    Detail(p,"Tampo mineral",new Vector3(0,.48f,0),new Vector3(1.01f,.04f,1.02f),"Pedra");
+                    renderer.enabled=false;
+                    Detail(p,"Armário",new Vector3(0,-.04f,0),new Vector3(.97f,.92f,.96f),"Carvalho");
+                    Detail(p,"Tampo mineral",new Vector3(0,.46f,0),new Vector3(1,.08f,1),"Pedra");
                     finish="Carvalho";break;
                 case "Prateleira":
                     renderer.enabled=false; obj.GetComponent<BoxCollider>().enabled=false;
@@ -166,7 +169,7 @@ namespace SebraeLab.Missions
                     finish="Nogueira";break;
                 case "Estrela arcade":finish="Aco";break;
                 case "Rastro":finish="Carvalho";break;
-                default:if(name==name.ToUpperInvariant())finish="Placa";break;
+                default:if(name.StartsWith("Destino •") || name=="Marca de percurso")finish="Sinal";else if(name==name.ToUpperInvariant())finish="Placa";break;
             }
             renderer.sharedMaterial=Get(finish);
         }
