@@ -15,7 +15,6 @@ namespace SebraeLab.Missions
         readonly Color navy = new Color(.04f,.13f,.22f), teal = new Color(.04f,.58f,.59f), gold = new Color(1,.68f,.14f);
         readonly MissionSurfaces surfaces = new MissionSurfaces();
         readonly List<Action> ticks = new List<Action>();
-        readonly List<Action> pinResets = new List<Action>();
         readonly List<Action> pending = new List<Action>();
         Transform area;
         TextMesh status, mural;
@@ -363,14 +362,16 @@ namespace SebraeLab.Missions
         {
             Room("Sala de descompressão",48,14,16);
             Sign("SALA DE DESCOMPRESSÃO",new Vector3(48,2.6f,0),.13f);
-            Shape("Pista de boliche",new Vector3(45,.04f,1),new Vector3(2,.08f,9),gold);
+            var lane=Shape("Pista de boliche",new Vector3(45,.04f,1),new Vector3(2,.08f,9),gold);
+            var gutterFloors=new List<Collider>();var gutterLips=new List<Collider>();
             foreach(float side in new[]{-1f,1f})
             {
                 float center=45+side*1.24f;
-                Shape("Fundo da calha",new Vector3(center,-.19f,1),new Vector3(.49f,.08f,9),navy);
+                gutterFloors.Add(Shape("Fundo da calha",new Vector3(center,-.19f,1),new Vector3(.49f,.08f,9),navy).GetComponent<Collider>());
                 foreach(float edge in new[]{-1f,1f}){
                     var lip=Shape("Lateral da calha",new Vector3(center+edge*.19f,-.075f,1),new Vector3(.09f,.28f,9),navy);
                     lip.transform.rotation=Quaternion.Euler(0,0,-edge*25);
+                    gutterLips.Add(lip.GetComponent<Collider>());
                 }
             }
             var ceiling=Shape("Teto preto",new Vector3(48,3.23f,0),new Vector3(14,.12f,16),navy);
@@ -386,14 +387,9 @@ namespace SebraeLab.Missions
                 var light=new GameObject("Luz quente").AddComponent<Light>();light.transform.SetParent(lamp.transform,true);
                 light.transform.position=new Vector3(x,2.9f,z);light.color=new Color(1,.89f,.73f);light.range=5;light.intensity=1.3f;light.renderMode=LightRenderMode.ForceVertex;
             }
-            var board=Sign("BOLICHE   •   0 / 10",new Vector3(45,2.2f,5.4f),.12f);
+            // Placar, rodadas e contagem ficam no BowlingLane.
+            var board=Sign("BOLICHE",new Vector3(45,2.2f,5.4f),.12f);
             var pins=new List<Rigidbody>();
-            int displayed=0;
-            ticks.Add(()=>{
-                int down=0;
-                foreach(var pin in pins) if(Vector3.Angle(pin.rotation*Vector3.up,Vector3.up)>35) down++;
-                if(down!=displayed){displayed=down;board.text="BOLICHE   •   "+down+" / 10";}
-            });
             for(int r=0;r<4;r++)for(int c=0;c<=r;c++){
                 var p=new Vector3(45+(c-r*.5f)*.27f,.32f,3+r*.27f);var pin=Shape("Pino",p,new Vector3(.16f,.24f,.16f),Color.white,PrimitiveType.Capsule);
                 // A flat sole supports the upright pin between throws.
@@ -402,15 +398,16 @@ namespace SebraeLab.Missions
                 foot.center=new Vector3(0,-.75f,0);foot.size=new Vector3(.69f,.5f,.69f);
                 var belly=pin.AddComponent<SphereCollider>();belly.center=new Vector3(0,-.27f,0);belly.radius=.47f;
                 var neck=pin.AddComponent<BoxCollider>();neck.center=new Vector3(0,.48f,0);neck.size=new Vector3(.40f,.98f,.40f);
-                var rb=pin.AddComponent<Rigidbody>();rb.mass=.22f;pins.Add(rb);pinResets.Add(()=>ResetBody(rb,p,Quaternion.identity));}
+                pins.Add(pin.AddComponent<Rigidbody>());}
             Sign("BOLICHE • lance a bola pela pista",new Vector3(45,1.9f,-3.5f),.085f);
             var ballPos=new Vector3(45,.85f,-3.8f);
             Shape("Suporte da bola",ballPos-Vector3.up*.48f,new Vector3(.65f,.68f,.65f),navy);
             foreach(float side in new[]{-1f,1f})
                 Shape("Trilho do berço",ballPos+new Vector3(side*.104f,-.123f,0),new Vector3(.053f,.055f,.49f),gold);
             var ball=Grab(Shape("Bola de boliche",ballPos,Vector3.one*.31f,teal,PrimitiveType.Sphere));
-            pinResets.Insert(0,()=>ResetBody(ball.GetComponent<Rigidbody>(),ballPos,Quaternion.identity));
-            Station("REARMAR BOLICHE",new Vector3(43,1,-3),()=>{if(!ball.isSelected){foreach(var reset in pinResets)reset();Physics.SyncTransforms();}});
+            var bowling=gameObject.AddComponent<BowlingLane>();
+            bowling.Configurar(lane.GetComponent<Collider>(),gutterFloors,gutterLips,pins,ball,board);
+            Station("REARMAR BOLICHE",new Vector3(43,1,-3),bowling.Rearmar);
             var counter=Sign("ARCO ARCADE • 0 pontos",new Vector3(51,2.3f,5),.09f);
             var target=Shape("Alvo luminoso",new Vector3(51,1.5f,5),new Vector3(1.4f,1.4f,.15f),gold,PrimitiveType.Sphere);
             Shape("Suporte do arco",new Vector3(51,.45f,-2),new Vector3(1,.9f,1),navy);
