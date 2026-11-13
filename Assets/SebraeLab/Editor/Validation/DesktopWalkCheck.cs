@@ -149,8 +149,10 @@ internal static class DesktopWalkCheck
         pc.UsePointer(false,true);
         yield return new WaitForSeconds(2);
         Require(GameObject.Find("Arco recurvo").transform.Find("Flecha de luz"),"Flecha não recarregou");
-        Require(UnityEngine.Object.FindObjectsByType<TextMesh>(FindObjectsSortMode.None).Any(t=>t.text.StartsWith("ARCO ARCADE • 1 ponto")),"Alvo não pontuou");
-        Note("Arco: acerto confirmado, 1 ponto");
+        var arcoTexto=UnityEngine.Object.FindObjectsByType<TextMesh>(FindObjectsSortMode.None).Select(t=>t.text).FirstOrDefault(t=>t.StartsWith("ARCO ARCADE • "));
+        int arcoPontos=-1;
+        Require(arcoTexto!=null && int.TryParse(arcoTexto.Substring("ARCO ARCADE • ".Length).Split(' ')[0],out arcoPontos) && arcoPontos>=2,"Alvo não pontuou: "+arcoTexto);
+        Note("Arco: acerto confirmado, "+arcoPontos+" pontos");
         yield return Click("REARMAR BOLICHE");
         yield return new WaitForSeconds(2);
         Require(Vector3.Distance(ball.position,new Vector3(45,.85f,-3.8f))<.18f,"Rearme da bola");

@@ -27,7 +27,7 @@ namespace SebraeLab.Missions
         public bool Reading => confirm && confirm.activeSelf;
         public void ConfirmReading(){if(Reading)UseStation(confirm);}
         public void ReturnToStart(){Move(new Vector3(5.7f,0,7.1f));}
-        int placed, score;
+        int placed;
         const int ItemCount = 6;
         // Etapa atual, objetivo e avisos. Aparece igual na placa de status (Quest) e no HUD do PC.
         MissionManager etapas;
@@ -424,21 +424,9 @@ namespace SebraeLab.Missions
             }
             Shape("Corda do arco",new Vector3(0,0,-.12f),new Vector3(.005f,1.54f,.005f),navy,parent:visual).GetComponent<Collider>().enabled=false;
             var hand=Grab(bow);
-            Sign("ARCO • mire e use o botão direito",new Vector3(51,2,-2),.073f);
-            var loaded=ArcadeArrow(visual);
-            float reloadAt=0;
-            ticks.Add(()=>{if(!loaded && Time.time>=reloadAt)loaded=ArcadeArrow(visual);});
-            hand.activated.AddListener(e=>{
-                if(!loaded)return;
-                var arrow=loaded;loaded=null;reloadAt=Time.time+.35f;
-                arrow.transform.SetParent(area,true);
-                arrow.transform.SetPositionAndRotation(bow.transform.position+bow.transform.forward*.38f,bow.transform.rotation);
-                var collider=arrow.AddComponent<BoxCollider>();collider.center=new Vector3(0,0,.48f);collider.size=new Vector3(.055f,.055f,.12f);
-                var rb=arrow.AddComponent<Rigidbody>();rb.useGravity=false;rb.collisionDetectionMode=CollisionDetectionMode.ContinuousDynamic;
-                rb.linearVelocity=arrow.transform.forward*9;
-                arrow.AddComponent<ArcadeStar>().Setup(target,()=>counter.text="ARCO ARCADE • "+(++score)+" pontos");
-                Destroy(arrow,3);
-            });
+            Sign("ARCO • segure e puxe a corda\ncom a outra mão\nPC: botão direito dispara",new Vector3(51,2,-2),.073f);
+            // Corda, disparo, física da flecha, anéis e placar ficam no ArcheryRange.
+            gameObject.AddComponent<ArcheryRange>().Configurar(hand,visual,()=>ArcadeArrow(visual),target,counter,area);
             Station("VOLTAR À ALA",new Vector3(48,1,-6),()=>Move(new Vector3(24,0,0)));
         }
         GameObject ArcadeArrow(Transform holder)
@@ -465,11 +453,5 @@ namespace SebraeLab.Missions
             for(int i=0;i<samples.Length;i++){float time=(float)i/rate;float beat=time%1;float hz=440*Mathf.Pow(2,(notes[(int)time]-69)/12f);samples[i]=.12f*Mathf.Sin(2*Mathf.PI*hz*beat)*Mathf.Sin(Mathf.PI*beat)*Mathf.Exp(-beat*3);}
             var clip=AudioClip.Create("Primeiro dia",samples.Length,1,rate,false);clip.SetData(samples,0);var source=gameObject.AddComponent<AudioSource>();source.clip=clip;source.loop=true;source.volume=.25f;source.Play();
         }
-    }
-    public class ArcadeStar : MonoBehaviour
-    {
-        GameObject target;Action hit;
-        public void Setup(GameObject t,Action action){target=t;hit=action;}
-        void OnCollisionEnter(Collision collision){if(collision.gameObject==target)hit();Destroy(gameObject);}
     }
 }
