@@ -110,7 +110,8 @@ namespace SebraeLab.Missions
                     obj.GetComponent<MeshFilter>().sharedMesh=cupMesh;
                     Detail(p,"Café e crema",new Vector3(0,.91f,0),new Vector3(.94f,.024f,.94f),"Cafe",PrimitiveType.Cylinder);
                     finish="Copo";break;
-                case "Luminária":case "Pé de aço":finish="Aco";break;
+                case "Luminária":finish="LuminariaAcesa";break;
+                case "Pé de aço":finish="Aco";break;
                 case "Mesa do escritório":case "Mesa de inovação":case "Mesa de coworking":case "Mesa da sala de aula":Table(obj,"Carvalho");return;
                 case "Balcão da copa":
                     renderer.enabled=false;
