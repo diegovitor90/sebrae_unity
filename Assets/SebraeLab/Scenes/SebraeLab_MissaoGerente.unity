@@ -4136,8 +4136,13 @@ PrefabInstance:
       propertyPath: m_Name
       value: SebraeLab - Ambiente
       objectReference: {fileID: 0}
+    - target: {fileID: 8894190327832539497, guid: 3010df8db9ee7564786a87c02df023cd, type: 3}
+      propertyPath: m_LocalPosition.z
+      value: 0.094
+      objectReference: {fileID: 0}
     m_RemovedComponents: []
-    m_RemovedGameObjects: []
+    m_RemovedGameObjects:
+    - {fileID: 8745160979546373880, guid: 3010df8db9ee7564786a87c02df023cd, type: 3}
     m_AddedGameObjects: []
     m_AddedComponents: []
   m_SourcePrefab: {fileID: 100100000, guid: 3010df8db9ee7564786a87c02df023cd, type: 3}
