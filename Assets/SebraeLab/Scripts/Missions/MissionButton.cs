@@ -62,6 +62,12 @@ namespace SebraeLab.Missions
         HapticImpulsePlayer vibrador;
         static AudioClip somClique, somNegado;
 
+        /// <summary>Distância entre cada face de Canvas e a face do corpo, em metros.</summary>
+        const float DistanciaDaFace = .002f;
+
+        /// <summary>Peça inteira do botão (corpo, moldura e as duas faces). Nula em botões montados à mão.</summary>
+        public GameObject Peca { get; private set; }
+
         /// <summary>Cinza: o Button está desativado ou a etapa exigida ainda não foi alcançada.</summary>
         public bool Bloqueado => !botao.interactable || (exigirEtapa && missoes && !missoes.Alcancou(etapa));
 
@@ -217,34 +223,57 @@ namespace SebraeLab.Missions
         }
 
         /// <summary>
-        /// Monta por código um botão completo: Canvas em World Space com Tracked Device Graphic
-        /// Raycaster, fundo, borda, texto e este componente. Devolve o objeto raiz, já ativo.
+        /// Monta por código um botão parado e de dois lados: um corpo opaco no meio, que esconde a face do outro lado,
+        /// e uma face de Canvas World Space com Tracked Device Graphic Raycaster em cada lado. As duas faces chamam a
+        /// mesma ação. Devolve o MissionButton da frente; a peça inteira fica em <see cref="Peca"/>.
         /// </summary>
         /// <param name="centro">Centro do botão no mundo.</param>
         /// <param name="tamanho">Largura e altura em metros.</param>
         public static MissionButton Criar(string legenda, Transform pai, Vector3 centro, Vector2 tamanho,
             UnityAction acao, MissionManager missoes = null, EtapaExpediente? etapa = null)
         {
+            var peca = new GameObject(legenda);
+            peca.SetActive(false); // só acorda os componentes depois de tudo configurado
+            peca.transform.SetParent(pai, false);
+            peca.transform.position = centro;
+
+            // Colisor da mira do modo PC, dentro do corpo: o raio do XR acerta a face, 2 mm à frente, antes dele.
+            var colisor = peca.AddComponent<BoxCollider>();
+            colisor.size = new Vector3(tamanho.x, tamanho.y, Placa.Espessura);
+
+            var moldura = Placa.Lamina(peca.transform, "Moldura", "PlacaMoldura");
+            moldura.localScale = new Vector3(tamanho.x + 2f * Placa.Borda, tamanho.y + 2f * Placa.Borda, Placa.Espessura * .8f);
+            var corpo = Placa.Lamina(peca.transform, "Corpo", "PlacaCorpo");
+            corpo.localScale = new Vector3(tamanho.x, tamanho.y, Placa.Espessura);
+
+            var frente = Face(peca.transform, "Frente", -1f, legenda, tamanho, acao, missoes, etapa);
+            var verso = Face(peca.transform, "Verso", 1f, legenda, tamanho, acao, missoes, etapa);
+            frente.Peca = peca;
+            verso.Peca = peca;
+            peca.SetActive(true);
+            return frente;
+        }
+
+        /// <summary>Uma face do botão: Canvas com fundo, borda, texto e este componente.</summary>
+        /// <param name="lado">-1 para a frente (lida por quem olha no sentido +Z da peça) e +1 para o verso.</param>
+        static MissionButton Face(Transform peca, string nome, float lado, string legenda, Vector2 tamanho,
+            UnityAction acao, MissionManager missoes, EtapaExpediente? etapa)
+        {
             const float escala = .001f; // 1 unidade do Canvas = 1 mm
             var area = tamanho / escala;
 
-            var raiz = new GameObject(legenda, typeof(RectTransform));
-            raiz.SetActive(false); // só acorda os componentes depois de tudo configurado
-            raiz.transform.SetParent(pai, false);
-            raiz.transform.position = centro;
+            var raiz = new GameObject(nome, typeof(RectTransform));
+            raiz.transform.SetParent(peca, false);
+            raiz.transform.localPosition = new Vector3(0f, 0f, lado * (Placa.Espessura / 2f + DistanciaDaFace));
+            raiz.transform.localRotation = lado < 0f ? Quaternion.identity : Quaternion.Euler(0f, 180f, 0f);
             raiz.transform.localScale = Vector3.one * escala;
             ((RectTransform)raiz.transform).sizeDelta = area;
 
             var canvas = raiz.AddComponent<Canvas>();
             canvas.renderMode = RenderMode.WorldSpace;
             canvas.worldCamera = Camera.main;
-            raiz.AddComponent<TrackedDeviceGraphicRaycaster>();
-
-            // Colisor 2 cm atrás da face: o raio do XR acerta a UI primeiro, por estar mais perto,
-            // e o modo teclado e mouse do editor, que usa Physics.Raycast, ainda encontra o botão.
-            var colisor = raiz.AddComponent<BoxCollider>();
-            colisor.size = new Vector3(area.x, area.y, 10f);
-            colisor.center = new Vector3(0f, 0f, 20f);
+            // A face de costas para o raio não responde: de qualquer lado, só a face voltada para quem aponta.
+            raiz.AddComponent<TrackedDeviceGraphicRaycaster>().ignoreReversedGraphics = true;
 
             var corpo = new GameObject("Botão", typeof(RectTransform), typeof(Image), typeof(Outline), typeof(Button));
             corpo.transform.SetParent(raiz.transform, false);
@@ -272,8 +301,6 @@ namespace SebraeLab.Missions
             botao.exigirEtapa = etapa.HasValue;
             if (etapa.HasValue) botao.etapa = etapa.Value;
             if (acao != null) botao.aoPressionar.AddListener(acao);
-
-            raiz.SetActive(true);
             return botao;
         }
 

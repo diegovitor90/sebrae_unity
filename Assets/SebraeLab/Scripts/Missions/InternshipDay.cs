@@ -179,7 +179,7 @@ namespace SebraeLab.Missions
         {
             // A ação entra na fila e roda no Update: evita mexer na cena dentro do evento de UI.
             var button=MissionButton.Criar(caption,area,p+Vector3.up*.25f,new Vector2(1.1f,.3f),()=>pending.Add(action),etapas,etapa);
-            var root=button.transform.parent.gameObject;
+            var root=button.Peca; // corpo e as duas faces: SetActive(false) esconde tudo
             // Parado: a direção é a do trecho, definida uma vez, sem girar para o jogador.
             root.transform.rotation=Quaternion.Euler(0f,Placa.GuinadaPadrao(root.transform.position),0f);
             stations[root]=button;

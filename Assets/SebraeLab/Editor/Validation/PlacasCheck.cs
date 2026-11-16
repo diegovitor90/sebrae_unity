@@ -5,6 +5,8 @@ using System.Linq;
 using System.Text;
 using UnityEditor;
 using UnityEngine;
+using UnityEngine.UI;
+using UnityEngine.XR.Interaction.Toolkit.UI;
 using SebraeLab.Missions;
 using Object = UnityEngine.Object;
 
@@ -62,7 +64,7 @@ namespace SebraeLab.Editor
             try
             {
                 // Passos executados no mesmo iterador: uma exceção chega ao finally e o relatório sai mesmo assim.
-                foreach (var passo in new Func<ManagerMission, Relatorio, IEnumerator>[] { Desenho, Paredes, Parada, Caixa, Mural, DoisLados, OutroLado, Memoria })
+                foreach (var passo in new Func<ManagerMission, Relatorio, IEnumerator>[] { Desenho, Paredes, Parada, Caixa, Mural, DoisLados, OutroLado, Botoes, Memoria })
                 {
                     var e = passo(mission, r);
                     while (true)
@@ -193,11 +195,15 @@ namespace SebraeLab.Editor
 
             foreach (var nome in BotoesDaMissao)
             {
-                var botao = botoes.FirstOrDefault(t => t.name == nome);
+                // O botão da missão é uma peça (o pai dos Canvas, com o nome da legenda); botão solto usa o próprio Canvas.
+                var botao = botoes.Select(PecaDoBotao).FirstOrDefault(t => t.name == nome);
                 r.Check(botao && Mathf.Abs(Mathf.DeltaAngle(botao.eulerAngles.y, 90f)) < .5f,
                     $"botão {nome} existe e está a 90° ({(botao ? botao.eulerAngles.y : float.NaN):0.#}°)");
             }
         }
+
+        /// <summary>Peça do botão (pai dos Canvas das duas faces) ou, em botão que não é peça, o próprio Canvas.</summary>
+        static Transform PecaDoBotao(Transform canvas) => canvas.parent && canvas.parent.Find("Corpo") ? canvas.parent : canvas;
 
         static IEnumerator Caixa(ManagerMission mission, Relatorio r)
         {
@@ -314,6 +320,55 @@ namespace SebraeLab.Editor
             int diferentes = Diferentes(comVerso, semVerso);
             r.Check(diferentes == 0, $"da frente, o texto do verso não aparece ({diferentes} pixels mudam com e sem ele)");
             Object.Destroy(copia);
+        }
+
+        static IEnumerator Botoes(ManagerMission mission, Relatorio r)
+        {
+            r.Secao("Botões");
+            int apertos = 0, apertosBloqueado = 0;
+            var pai = new GameObject("Teste dos botões (placas)").transform;
+            MissionButton.Criar("TESTE", pai, LugarDoTeste, new Vector2(1.1f, .3f), () => apertos++);
+            var missoes = Object.FindFirstObjectByType<MissionManager>();
+            var paiBloqueado = new GameObject("Teste do botão bloqueado (placas)").transform;
+            MissionButton.Criar("TESTE BLOQUEADO", paiBloqueado, LugarDoTeste + Vector3.up * 3f, new Vector2(1.1f, .3f),
+                () => apertosBloqueado++, missoes, EtapaExpediente.Descompressao);
+            yield return null;
+
+            var peca = pai.childCount == 1 ? pai.GetChild(0) : null;
+            r.Check(peca && peca.Find("Corpo") && peca.Find("Moldura") && peca.Find("Frente") && peca.Find("Verso") && peca.GetComponent<BoxCollider>(),
+                "o botão é uma peça com corpo, moldura, frente, verso e colisor");
+            var faces = pai.GetComponentsInChildren<MissionButton>();
+            r.Check(faces.Length == 2, $"o botão tem duas faces ({faces.Length})");
+            foreach (var face in faces) face.GetComponent<Button>().onClick.Invoke();
+            r.Check(faces.Length == 2 && apertos == 2, $"cada face dispara a ação uma vez ({apertos} disparos em {faces.Length} faces)");
+            r.Check(faces.All(f => f.GetComponentInParent<TrackedDeviceGraphicRaycaster>().ignoreReversedGraphics),
+                "cada face ignora o raio que chega pelas costas");
+
+            var facesBloqueadas = paiBloqueado.GetComponentsInChildren<MissionButton>();
+            foreach (var face in facesBloqueadas) face.GetComponent<Button>().onClick.Invoke();
+            r.Check(facesBloqueadas.Length == 2 && facesBloqueadas.All(f => f.Bloqueado) && apertosBloqueado == 0,
+                $"o bloqueio por etapa vale nas duas faces ({facesBloqueadas.Count(f => f.Bloqueado)} bloqueadas, {apertosBloqueado} disparos)");
+
+            if (peca && peca.Find("Verso"))
+            {
+                var comVerso = Renderizar(false);
+                peca.Find("Verso").gameObject.SetActive(false);
+                var semVerso = Renderizar(false);
+                int diferentes = Diferentes(comVerso, semVerso);
+                r.Check(diferentes == 0, $"da frente, a face do verso não aparece ({diferentes} pixels mudam com e sem ela)");
+            }
+            Object.Destroy(pai.gameObject);
+            Object.Destroy(paiBloqueado.gameObject);
+            yield return null; // Destroy só acontece no fim do quadro: sem esperar, os botões de teste entrariam na contagem
+
+            // Os 8 botões da missão (Station): cada um numa peça com duas faces.
+            var pecasDaMissao = Object.FindObjectsByType<MissionButton>(FindObjectsInactive.Include, FindObjectsSortMode.None)
+                .Select(b => b.GetComponentInParent<Canvas>(true).transform.parent)
+                .Where(p => p && p.Find("Corpo"))
+                .GroupBy(p => p)
+                .ToList();
+            r.Check(pecasDaMissao.Count == 8 && pecasDaMissao.All(g => g.Count() == 2),
+                $"os 8 botões da missão têm duas faces ({pecasDaMissao.Count} peças, {pecasDaMissao.Count(g => g.Count() == 2)} com duas faces)");
         }
 
         /// <summary>Limite de lixo gerado pelas placas, em bytes por quadro (todas juntas), definido a partir da medição do código antigo.</summary>
