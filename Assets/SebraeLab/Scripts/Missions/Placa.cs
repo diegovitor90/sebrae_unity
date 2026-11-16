@@ -11,11 +11,14 @@ namespace SebraeLab.Missions
         static Material materialDoTexto;
         static Font fonteDoMaterial;
 
-        /// <summary>Antes deste x a rota anda no eixo Z (praça e galeria); a partir dele, no eixo X.</summary>
+        /// <summary>Antes deste x a rota anda no eixo Z, no sentido -Z (praça e galeria); a partir dele, no eixo X.</summary>
         public const float LimiteDoTrecho = 15f;
 
-        /// <summary>Direção de uma placa ou botão parado: de frente para o sentido em que se anda no trecho.</summary>
-        public static float GuinadaPadrao(Vector3 posicao) => posicao.x < LimiteDoTrecho ? 0f : 90f;
+        /// <summary>
+        /// Direção de uma placa ou botão parado. A frente (+Z local) aponta para longe de quem lê, no sentido em que
+        /// se anda no trecho: 180° (para -Z) antes do limite e 90° (para +X) a partir dele.
+        /// </summary>
+        public static float GuinadaPadrao(Vector3 posicao) => posicao.x < LimiteDoTrecho ? 180f : 90f;
 
         /// <summary>
         /// Material do texto, compartilhado por todas as placas. A fonte é dinâmica: o Unity pode recriar a textura

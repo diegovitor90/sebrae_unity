@@ -128,37 +128,68 @@ namespace SebraeLab.Editor
             r.Check(comParede == 0, $"atrás de uma parede, o texto some ({comParede} pixels brancos)");
         }
 
+        static readonly string[] BotoesDaMissao =
+        {
+            "ENTRAR NA ALA DE ATIVIDADES", "VOLTAR À RECEPÇÃO", "RECOMEÇAR O DIA", "LER O MURAL",
+            "ENTENDIDO", "SALA DE DESCOMPRESSÃO", "REARMAR BOLICHE", "VOLTAR À ALA"
+        };
+
         static IEnumerator Parada(ManagerMission mission, Relatorio r)
         {
             r.Secao("Parada");
             yield return null;
-            var placas = Object.FindObjectsByType<TextMesh>(FindObjectsSortMode.None).Where(t => t.name == "Placa").Select(t => t.transform).ToList();
-            var botoes = Object.FindObjectsByType<MissionButton>(FindObjectsSortMode.None)
-                .Select(b => b.GetComponentInParent<Canvas>().transform).Distinct().ToList();
+            var placas = Object.FindObjectsByType<TextMesh>(FindObjectsInactive.Include, FindObjectsSortMode.None)
+                .Where(t => t.name == "Placa").Select(t => t.transform).ToList();
+            var botoes = Object.FindObjectsByType<MissionButton>(FindObjectsInactive.Include, FindObjectsSortMode.None)
+                .Select(b => b.GetComponentInParent<Canvas>(true).transform).Distinct().ToList();
             var todos = placas.Concat(botoes).ToList();
             var antes = todos.Select(t => t.rotation).ToList();
             var cabeca = mission.playerHead;
             var posicao = cabeca.position;
             var rotacao = cabeca.rotation;
-            cabeca.SetPositionAndRotation(posicao + new Vector3(3f, 0f, 3f), rotacao * Quaternion.Euler(0f, 90f, 0f));
-            yield return null;
-            yield return null;
-            int giraram = Enumerable.Range(0, todos.Count).Count(i => Quaternion.Angle(antes[i], todos[i].rotation) > .01f);
+            // Duas mudanças de cabeça em direções bem diferentes: um objeto que gira só numa delas ainda é pego,
+            // e um objeto que por acaso já olhava para a cabeça numa delas não passa por parado.
+            var giraram = new bool[todos.Count];
+            var mudancas = new[]
+            {
+                (new Vector3(3f, 0f, 3f), Quaternion.Euler(0f, 90f, 0f)),
+                (new Vector3(-4f, 0f, 2f), Quaternion.Euler(0f, -60f, 0f)),
+            };
+            foreach (var (deslocamento, giro) in mudancas)
+            {
+                cabeca.SetPositionAndRotation(posicao + deslocamento, rotacao * giro);
+                yield return null;
+                yield return null;
+                for (int i = 0; i < todos.Count; i++)
+                    if (Quaternion.Angle(antes[i], todos[i].rotation) > .01f) giraram[i] = true;
+            }
             cabeca.SetPositionAndRotation(posicao, rotacao);
+            int giraramTotal = giraram.Count(g => g);
 
-            r.Check(placas.Count > 0 && botoes.Count > 0, $"{placas.Count} placas e {botoes.Count} botões na cena");
-            r.Check(giraram == 0, $"nada gira com a cabeça ({giraram} de {todos.Count} giraram)");
+            r.Check(placas.Count > 0 && botoes.Count > 0, $"{placas.Count} placas e {botoes.Count} botões na cena (inativos incluídos)");
+            r.Check(giraramTotal == 0, $"nada gira com a cabeça, em duas mudanças diferentes ({giraramTotal} de {todos.Count} giraram)");
             int foraDoEixo = placas.Count(t => Mathf.Abs(Mathf.DeltaAngle(t.eulerAngles.y, Mathf.Round(t.eulerAngles.y / 90f) * 90f)) > .5f);
             r.Check(foraDoEixo == 0, $"toda placa parada num eixo (0°, 90°, 180° ou 270°): {foraDoEixo} fora");
+
+            // Convenção do projeto: a placa é lida por quem olha no sentido do seu próprio +Z, então a frente
+            // (forward) aponta para longe de quem lê.
             var primeiroDia = placas.FirstOrDefault(t => t.GetComponent<TextMesh>().text.StartsWith("PRIMEIRO DIA"));
-            r.Check(primeiroDia && Mathf.Abs(Mathf.DeltaAngle(primeiroDia.eulerAngles.y, 90f)) < .5f,
-                $"PRIMEIRO DIA a 90°, de frente para quem nasce na recepção ({(primeiroDia ? primeiroDia.eulerAngles.y : float.NaN):0.#}°)");
+            r.Check(primeiroDia && Mathf.Abs(Mathf.DeltaAngle(primeiroDia.eulerAngles.y, 270f)) < .5f,
+                $"PRIMEIRO DIA a 270°, lida por quem nasce a leste olhando o gerente ({(primeiroDia ? primeiroDia.eulerAngles.y : float.NaN):0.#}°)");
+            r.Check(primeiroDia && Vector3.Dot(primeiroDia.forward, primeiroDia.position - new Vector3(5.7f, 1.62f, 7.1f)) > 0f,
+                "quem nasce na recepção lê PRIMEIRO DIA pela frente");
             var galeria = placas.FirstOrDefault(t => t.GetComponent<TextMesh>().text.StartsWith("SALA 2"));
-            r.Check(galeria && Mathf.Abs(Mathf.DeltaAngle(galeria.eulerAngles.y, 0f)) < .5f,
-                $"SALA 2 → ALA DE AULAS a 0°, sobre a galeria ({(galeria ? galeria.eulerAngles.y : float.NaN):0.#}°)");
-            var rearmar = GameObject.Find("REARMAR BOLICHE");
-            r.Check(rearmar && Mathf.Abs(Mathf.DeltaAngle(rearmar.transform.eulerAngles.y, 90f)) < .5f,
-                $"botão REARMAR BOLICHE a 90° ({(rearmar ? rearmar.transform.eulerAngles.y : float.NaN):0.#}°)");
+            r.Check(galeria && Mathf.Abs(Mathf.DeltaAngle(galeria.eulerAngles.y, 180f)) < .5f,
+                $"SALA 2 → ALA DE AULAS a 180°, sobre a galeria ({(galeria ? galeria.eulerAngles.y : float.NaN):0.#}°)");
+            r.Check(galeria && Vector3.Dot(galeria.forward, Vector3.back) > .99f,
+                "quem desce a galeria no sentido −Z lê SALA 2 → ALA DE AULAS pela frente");
+
+            foreach (var nome in BotoesDaMissao)
+            {
+                var botao = botoes.FirstOrDefault(t => t.name == nome);
+                r.Check(botao && Mathf.Abs(Mathf.DeltaAngle(botao.eulerAngles.y, 90f)) < .5f,
+                    $"botão {nome} existe e está a 90° ({(botao ? botao.eulerAngles.y : float.NaN):0.#}°)");
+            }
         }
 
         // Ajudantes ---------------------------------------------------------------------------------------

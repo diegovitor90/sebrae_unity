@@ -37,7 +37,7 @@ namespace SebraeLab.Missions
             mission = manager;
             if (!TryGetComponent(out etapas)) etapas = gameObject.AddComponent<MissionManager>();
             area = new GameObject("Missão Estágio • percurso").transform;
-            Sign("PRIMEIRO DIA\nProcure o gestor do espaço",new Vector3(3.9f,1.9f,7.4f),.067f,90f); // de frente para quem nasce olhando o gerente
+            Sign("PRIMEIRO DIA\nProcure o gestor do espaço",new Vector3(3.9f,1.9f,7.4f),.067f,270f); // lida por quem nasce a leste, olhando para o gerente (−X)
             Music();
             hinge = new GameObject("Dobradiça da sala").transform;
             door = hinge.gameObject.AddComponent<HandDoor>();
