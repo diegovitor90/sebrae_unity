@@ -62,7 +62,7 @@ namespace SebraeLab.Editor
             try
             {
                 // Passos executados no mesmo iterador: uma exceção chega ao finally e o relatório sai mesmo assim.
-                foreach (var passo in new Func<ManagerMission, Relatorio, IEnumerator>[] { Desenho, Paredes })
+                foreach (var passo in new Func<ManagerMission, Relatorio, IEnumerator>[] { Desenho, Paredes, Parada })
                 {
                     var e = passo(mission, r);
                     while (e.MoveNext()) yield return e.Current;
@@ -126,6 +126,39 @@ namespace SebraeLab.Editor
             r.Check(Mathf.Abs(semParede - referencia) <= referencia * .1f,
                 $"o texto tem a mesma forma do material padrão da fonte ({semParede} e {referencia} pixels brancos)");
             r.Check(comParede == 0, $"atrás de uma parede, o texto some ({comParede} pixels brancos)");
+        }
+
+        static IEnumerator Parada(ManagerMission mission, Relatorio r)
+        {
+            r.Secao("Parada");
+            yield return null;
+            var placas = Object.FindObjectsByType<TextMesh>(FindObjectsSortMode.None).Where(t => t.name == "Placa").Select(t => t.transform).ToList();
+            var botoes = Object.FindObjectsByType<MissionButton>(FindObjectsSortMode.None)
+                .Select(b => b.GetComponentInParent<Canvas>().transform).Distinct().ToList();
+            var todos = placas.Concat(botoes).ToList();
+            var antes = todos.Select(t => t.rotation).ToList();
+            var cabeca = mission.playerHead;
+            var posicao = cabeca.position;
+            var rotacao = cabeca.rotation;
+            cabeca.SetPositionAndRotation(posicao + new Vector3(3f, 0f, 3f), rotacao * Quaternion.Euler(0f, 90f, 0f));
+            yield return null;
+            yield return null;
+            int giraram = Enumerable.Range(0, todos.Count).Count(i => Quaternion.Angle(antes[i], todos[i].rotation) > .01f);
+            cabeca.SetPositionAndRotation(posicao, rotacao);
+
+            r.Check(placas.Count > 0 && botoes.Count > 0, $"{placas.Count} placas e {botoes.Count} botões na cena");
+            r.Check(giraram == 0, $"nada gira com a cabeça ({giraram} de {todos.Count} giraram)");
+            int foraDoEixo = placas.Count(t => Mathf.Abs(Mathf.DeltaAngle(t.eulerAngles.y, Mathf.Round(t.eulerAngles.y / 90f) * 90f)) > .5f);
+            r.Check(foraDoEixo == 0, $"toda placa parada num eixo (0°, 90°, 180° ou 270°): {foraDoEixo} fora");
+            var primeiroDia = placas.FirstOrDefault(t => t.GetComponent<TextMesh>().text.StartsWith("PRIMEIRO DIA"));
+            r.Check(primeiroDia && Mathf.Abs(Mathf.DeltaAngle(primeiroDia.eulerAngles.y, 90f)) < .5f,
+                $"PRIMEIRO DIA a 90°, de frente para quem nasce na recepção ({(primeiroDia ? primeiroDia.eulerAngles.y : float.NaN):0.#}°)");
+            var galeria = placas.FirstOrDefault(t => t.GetComponent<TextMesh>().text.StartsWith("SALA 2"));
+            r.Check(galeria && Mathf.Abs(Mathf.DeltaAngle(galeria.eulerAngles.y, 0f)) < .5f,
+                $"SALA 2 → ALA DE AULAS a 0°, sobre a galeria ({(galeria ? galeria.eulerAngles.y : float.NaN):0.#}°)");
+            var rearmar = GameObject.Find("REARMAR BOLICHE");
+            r.Check(rearmar && Mathf.Abs(Mathf.DeltaAngle(rearmar.transform.eulerAngles.y, 90f)) < .5f,
+                $"botão REARMAR BOLICHE a 90° ({(rearmar ? rearmar.transform.eulerAngles.y : float.NaN):0.#}°)");
         }
 
         // Ajudantes ---------------------------------------------------------------------------------------

@@ -37,7 +37,7 @@ namespace SebraeLab.Missions
             mission = manager;
             if (!TryGetComponent(out etapas)) etapas = gameObject.AddComponent<MissionManager>();
             area = new GameObject("Missão Estágio • percurso").transform;
-            Sign("PRIMEIRO DIA\nProcure o gestor do espaço",new Vector3(3.9f,1.9f,7.4f),.067f);
+            Sign("PRIMEIRO DIA\nProcure o gestor do espaço",new Vector3(3.9f,1.9f,7.4f),.067f,90f); // de frente para quem nasce olhando o gerente
             Music();
             hinge = new GameObject("Dobradiça da sala").transform;
             door = hinge.gameObject.AddComponent<HandDoor>();
@@ -155,14 +155,16 @@ namespace SebraeLab.Missions
             surfaces.Apply(g,name);
             return g;
         }
-        TextMesh Sign(string value,Vector3 pos,float size)
+        TextMesh Sign(string value,Vector3 pos,float size,float? guinada=null)
         {
             var g=new GameObject("Placa");g.transform.SetParent(area);g.transform.position=pos;
+            // Parada: a direção é a do trecho, definida uma vez, sem girar para o jogador.
+            g.transform.rotation=Quaternion.Euler(0f,guinada??Placa.GuinadaPadrao(pos),0f);
             var t=g.AddComponent<TextMesh>();
             t.font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
             g.GetComponent<MeshRenderer>().sharedMaterial = Placa.MaterialDoTexto(t.font);
             t.fontSize=72;t.characterSize=size*.1f;t.anchor=TextAnchor.MiddleCenter;t.alignment=TextAlignment.Center;t.text=value;
-            ticks.Add(()=>{var d=t.transform.position-mission.playerHead.position;d.y=0;if(d.sqrMagnitude>.001f)t.transform.rotation=Quaternion.LookRotation(d);});return t;
+            return t;
         }
         // Objetos clicáveis no modo PC que não são botões de missão (maçanetas).
         readonly Dictionary<GameObject, Action> desktopActions = new Dictionary<GameObject, Action>();
@@ -187,10 +189,8 @@ namespace SebraeLab.Missions
             // A ação entra na fila e roda no Update: evita mexer na cena dentro do evento de UI.
             var button=MissionButton.Criar(caption,area,p+Vector3.up*.25f,new Vector2(1.1f,.3f),()=>pending.Add(action),etapas,etapa);
             var root=button.transform.parent.gameObject;
-            ticks.Add(()=>{
-                var direction=root.transform.position-mission.playerHead.position;direction.y=0;
-                if(direction.sqrMagnitude>.001f)root.transform.rotation=Quaternion.LookRotation(direction);
-            });
+            // Parado: a direção é a do trecho, definida uma vez, sem girar para o jogador.
+            root.transform.rotation=Quaternion.Euler(0f,Placa.GuinadaPadrao(root.transform.position),0f);
             stations[root]=button;
             return root;
         }
