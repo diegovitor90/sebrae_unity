@@ -160,7 +160,7 @@ namespace SebraeLab.Missions
             var g=new GameObject("Placa");g.transform.SetParent(area);g.transform.position=pos;
             var t=g.AddComponent<TextMesh>();
             t.font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
-            g.GetComponent<MeshRenderer>().sharedMaterial = t.font.material;
+            g.GetComponent<MeshRenderer>().sharedMaterial = Placa.MaterialDoTexto(t.font);
             t.fontSize=72;t.characterSize=size*.1f;t.anchor=TextAnchor.MiddleCenter;t.alignment=TextAlignment.Center;t.text=value;
             ticks.Add(()=>{var d=t.transform.position-mission.playerHead.position;d.y=0;if(d.sqrMagnitude>.001f)t.transform.rotation=Quaternion.LookRotation(d);});return t;
         }
