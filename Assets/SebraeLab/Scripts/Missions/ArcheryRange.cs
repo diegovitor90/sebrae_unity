@@ -1,6 +1,7 @@
 using System;
 using UnityEngine;
 using UnityEngine.XR.Interaction.Toolkit;
+using UnityEngine.XR.Interaction.Toolkit.Attachment;
 using UnityEngine.XR.Interaction.Toolkit.Interactables;
 
 namespace SebraeLab.Missions
@@ -58,6 +59,9 @@ namespace SebraeLab.Missions
             Physics.SyncTransforms();
 
             FlechaCarregada = montarFlecha();
+            // O rig pega de longe na ponta do raio. Assim o arco ficaria flutuando longe da mão, e a outra mão
+            // não alcançaria a corda: pego pelo raio, ele vem para a mão.
+            arco.farAttachMode = InteractableFarAttachMode.Near;
             arco.activated.AddListener(AoAtivar);
             arco.selectEntered.AddListener(AoPegarArco);
             arco.selectExited.AddListener(AoSoltarArco);

@@ -97,6 +97,9 @@ namespace SebraeLab.Editor
             r.Check(Mathf.Approximately(corpo.mass, 6f) && Mathf.Approximately(corpo.maxAngularVelocity, 60f) && corpo.interpolation == RigidbodyInterpolation.Interpolate,
                 $"bola: {corpo.mass} kg, rotação máxima {corpo.maxAngularVelocity}, interpolação {corpo.interpolation}");
             r.Check(lane.Pinos.Count == 10 && lane.Pinos.All(p => Mathf.Approximately(p.mass, 1.5f)), $"{lane.Pinos.Count} pinos com 1,5 kg");
+            var maos = PegadaDeLonge.MaosDoRig();
+            r.Check(maos.Count > 0 && maos.All(m => PegadaDeLonge.VemParaAMao(lane.Bola, m)),
+                $"bola pega pelo raio vem para a mão, e não fica na ponta do raio (rig com {maos.Count} NearFarInteractor)");
         }
 
         static IEnumerator Ajuda(BowlingLane lane, Relatorio r)
