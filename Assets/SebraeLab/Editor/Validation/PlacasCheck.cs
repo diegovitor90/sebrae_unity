@@ -62,7 +62,7 @@ namespace SebraeLab.Editor
             try
             {
                 // Passos executados no mesmo iterador: uma exceção chega ao finally e o relatório sai mesmo assim.
-                foreach (var passo in new Func<ManagerMission, Relatorio, IEnumerator>[] { Desenho, Paredes, Parada })
+                foreach (var passo in new Func<ManagerMission, Relatorio, IEnumerator>[] { Desenho, Paredes, Parada, Caixa, DoisLados, OutroLado })
                 {
                     var e = passo(mission, r);
                     while (e.MoveNext()) yield return e.Current;
@@ -190,6 +190,88 @@ namespace SebraeLab.Editor
                 r.Check(botao && Mathf.Abs(Mathf.DeltaAngle(botao.eulerAngles.y, 90f)) < .5f,
                     $"botão {nome} existe e está a 90° ({(botao ? botao.eulerAngles.y : float.NaN):0.#}°)");
             }
+        }
+
+        static IEnumerator Caixa(ManagerMission mission, Relatorio r)
+        {
+            r.Secao("Caixa");
+            yield return null;
+            var raizes = Object.FindObjectsByType<TextMesh>(FindObjectsInactive.Include, FindObjectsSortMode.None).Where(t => t.name == "Placa").ToList();
+            int semCaixa = 0, pequenas = 0, comColisor = 0, outroMaterial = 0;
+            foreach (var t in raizes)
+            {
+                var corpo = t.transform.Find("Corpo");
+                var moldura = t.transform.Find("Moldura");
+                var verso = t.transform.Find("Verso");
+                if (!corpo || !moldura || !verso) { semCaixa++; continue; }
+                var medida = MedidaLocal(t);
+                int linhas = Mathf.Max(1, t.text.Split('\n').Length);
+                float margem = .5f * medida.size.y / linhas;
+                if (corpo.localScale.x < medida.size.x + 1.8f * margem || corpo.localScale.y < medida.size.y + 1.8f * margem) pequenas++;
+                if (corpo.GetComponent<Collider>() || moldura.GetComponent<Collider>()) comColisor++;
+                if (!corpo.GetComponent<Renderer>().sharedMaterial.name.StartsWith("PlacaCorpo")
+                    || !moldura.GetComponent<Renderer>().sharedMaterial.name.StartsWith("PlacaMoldura")) outroMaterial++;
+            }
+            var inativas = raizes.Where(t => !t.gameObject.activeInHierarchy && t.transform.Find("Corpo")).ToList();
+            var comCaixa = raizes.Where(t => t.transform.Find("Corpo")).Select(t => t.transform.Find("Corpo").localScale).ToList();
+            if (comCaixa.Count > 0)
+                r.Info($"{inativas.Count} placas inativas na hierarquia; menor caixa {comCaixa.Min(c => c.x):0.###} x {comCaixa.Min(c => c.y):0.###} m"
+                    + (inativas.Count > 0 ? $"; caixas das inativas: {string.Join(", ", inativas.Select(t => $"{t.transform.Find("Corpo").localScale.x:0.###}x{t.transform.Find("Corpo").localScale.y:0.###}"))}" : ""));
+            r.Check(raizes.Count > 0 && semCaixa == 0, $"{raizes.Count - semCaixa} de {raizes.Count} placas com corpo, moldura e verso");
+            r.Check(pequenas == 0, $"a caixa cobre o texto com margem em todas ({pequenas} pequenas demais)");
+            r.Check(comColisor == 0, $"caixas sem colisor ({comColisor} com colisor)");
+            r.Check(outroMaterial == 0, $"corpo PlacaCorpo e moldura PlacaMoldura em todas ({outroMaterial} com outro material)");
+        }
+
+        static IEnumerator DoisLados(ManagerMission mission, Relatorio r)
+        {
+            r.Secao("Dois lados");
+            var original = PlacaDeReferencia();
+            if (!original) { r.Check(false, $"placa \"{TextoDeReferencia}\" encontrada na cena"); yield break; }
+            var copia = CopiarParaOTeste(original);
+            yield return null;
+            var frente = copia.GetComponent<TextMesh>();
+            var verso = copia.transform.Find("Verso") ? copia.transform.Find("Verso").GetComponent<TextMesh>() : null;
+            var corpo = copia.transform.Find("Corpo");
+            r.Check(verso && corpo, "a placa tem verso e corpo");
+            if (!verso || !corpo) { Object.Destroy(copia); yield break; }
+            r.Check(verso.text == frente.text && Mathf.Abs(Mathf.DeltaAngle(verso.transform.localEulerAngles.y, 180f)) < .5f,
+                "o verso tem o mesmo texto, girado 180°");
+            float alturaAntes = corpo.localScale.y;
+            frente.text = "UMA LINHA\nDUAS LINHAS\nTRÊS LINHAS";
+            yield return null;
+            yield return null;
+            r.Check(verso.text == frente.text, "o verso acompanha quando o texto da frente muda");
+            r.Check(corpo.localScale.y > alturaAntes * 1.5f, $"a caixa cresce com o texto (altura de {alturaAntes:0.###} para {corpo.localScale.y:0.###} m)");
+            int deTras = ContarBrancos(Renderizar(true));
+            r.Check(deTras > 20, $"por trás, o verso aparece ({deTras} pixels brancos)");
+            Object.Destroy(copia);
+        }
+
+        static IEnumerator OutroLado(ManagerMission mission, Relatorio r)
+        {
+            r.Secao("Outro lado");
+            var original = PlacaDeReferencia();
+            if (!original) { r.Check(false, $"placa \"{TextoDeReferencia}\" encontrada na cena"); yield break; }
+            var copia = CopiarParaOTeste(original);
+            yield return null;
+            var verso = copia.transform.Find("Verso");
+            if (!verso) { r.Check(false, "a placa tem verso"); Object.Destroy(copia); yield break; }
+            var comVerso = Renderizar(false);
+            verso.gameObject.SetActive(false);
+            var semVerso = Renderizar(false);
+            int diferentes = Diferentes(comVerso, semVerso);
+            r.Check(diferentes == 0, $"da frente, o texto do verso não aparece ({diferentes} pixels mudam com e sem ele)");
+            Object.Destroy(copia);
+        }
+
+        /// <summary>Caixa do texto da frente no espaço da raiz da placa (rotação em múltiplos de 90°).</summary>
+        static Bounds MedidaLocal(TextMesh texto)
+        {
+            var mundo = texto.GetComponent<MeshRenderer>().bounds;
+            var tamanho = texto.transform.InverseTransformVector(mundo.size);
+            return new Bounds(texto.transform.InverseTransformPoint(mundo.center),
+                new Vector3(Mathf.Abs(tamanho.x), Mathf.Abs(tamanho.y), Mathf.Abs(tamanho.z)));
         }
 
         // Ajudantes ---------------------------------------------------------------------------------------

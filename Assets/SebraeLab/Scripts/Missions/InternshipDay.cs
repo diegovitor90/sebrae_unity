@@ -155,17 +155,8 @@ namespace SebraeLab.Missions
             surfaces.Apply(g,name);
             return g;
         }
-        TextMesh Sign(string value,Vector3 pos,float size,float? guinada=null)
-        {
-            var g=new GameObject("Placa");g.transform.SetParent(area);g.transform.position=pos;
-            // Parada: a direção é a do trecho, definida uma vez, sem girar para o jogador.
-            g.transform.rotation=Quaternion.Euler(0f,guinada??Placa.GuinadaPadrao(pos),0f);
-            var t=g.AddComponent<TextMesh>();
-            t.font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
-            g.GetComponent<MeshRenderer>().sharedMaterial = Placa.MaterialDoTexto(t.font);
-            t.fontSize=72;t.characterSize=size*.1f;t.anchor=TextAnchor.MiddleCenter;t.alignment=TextAlignment.Center;t.text=value;
-            return t;
-        }
+        // Placa parada, em caixa, legível dos dois lados e escondida por paredes (ver Placa).
+        TextMesh Sign(string value,Vector3 pos,float size,float? guinada=null) => Placa.Criar(value,pos,size,area,guinada);
         // Objetos clicáveis no modo PC que não são botões de missão (maçanetas).
         readonly Dictionary<GameObject, Action> desktopActions = new Dictionary<GameObject, Action>();
         // Botões de missão, pela raiz (que tem o colisor da mira do PC) e pelo painel do mural.
