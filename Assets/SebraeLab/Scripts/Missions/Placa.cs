@@ -24,6 +24,8 @@ namespace SebraeLab.Missions
         public const float Folga = .001f;
         /// <summary>Antes deste x a rota anda no eixo Z (praça e galeria); a partir dele, no eixo X.</summary>
         public const float LimiteDoTrecho = 15f;
+        /// <summary>Intervalo, em segundos, entre as conferências do texto de cada placa.</summary>
+        const float IntervaloDaConferencia = .2f;
 
         static Material materialDoTexto;
         static Font fonteDoMaterial;
@@ -33,9 +35,15 @@ namespace SebraeLab.Missions
         public Transform Corpo { get; private set; }
         public Transform Moldura { get; private set; }
 
+        /// <summary>Tamanho mínimo do colisor de clique, se a placa tiver um BoxCollider (o mural do modo PC).</summary>
+        public Vector3 colisorMinimo;
+
         MeshRenderer textoDaFrente;
         Bounds ultimaMedida;
         string ultimoTexto;
+        BoxCollider colisor;
+        float proximaConferencia;
+        bool escalonada;
 
         /// <summary>Direção de uma placa ou botão parado: de frente para o sentido em que se anda no trecho.</summary>
         public static float GuinadaPadrao(Vector3 posicao) => posicao.x < LimiteDoTrecho ? 180f : 90f;
@@ -113,7 +121,7 @@ namespace SebraeLab.Missions
             if (!Corpo) Corpo = Lamina(transform, "Corpo", "PlacaCorpo");
             var verso = transform.Find("Verso");
             Verso = verso ? verso.GetComponent<TextMesh>() : CriarVerso();
-            Ajustar(MedirTexto());
+            Ajustar(MedirTexto(), Frente.text);
         }
 
         TextMesh CriarVerso()
@@ -136,16 +144,42 @@ namespace SebraeLab.Missions
 
         void LateUpdate()
         {
-            if (Verso.text != Frente.text) Verso.text = Frente.text;
-            if (Verso.color != Frente.color) Verso.color = Frente.color;
+            // A cada quadro só se mede o texto (sem lixo); ler TextMesh.text cria uma string nova a cada leitura.
             var medida = MedirTexto();
-            if (medida != ultimaMedida || Frente.text != ultimoTexto) Ajustar(medida);
-            // Painel clicável no modo PC (como o do mural): o colisor acompanha a caixa.
-            if (TryGetComponent(out BoxCollider colisor) && (colisor.center != Corpo.localPosition || colisor.size != Corpo.localScale))
+            if (medida != ultimaMedida) Sincronizar(medida, Frente.text); // o tamanho mudou: a caixa reage na hora
+            else if (Time.time >= proximaConferencia)
             {
-                colisor.center = Corpo.localPosition;
-                colisor.size = Corpo.localScale;
+                // Conferência a cada 0,2 s por placa, com fase aleatória na segunda para as placas não conferirem juntas.
+                proximaConferencia = Time.time + (escalonada ? IntervaloDaConferencia : Random.value * IntervaloDaConferencia);
+                escalonada = true;
+                var texto = Frente.text;
+                if (texto != ultimoTexto) Sincronizar(medida, texto);
+                if (Verso.color != Frente.color) Verso.color = Frente.color;
+                TryGetComponent(out colisor); // o colisor pode ser acrescentado depois que a placa nasce
             }
+            // Painel clicável no modo PC (como o do mural): o colisor acompanha a caixa, sem ficar menor que o mínimo.
+            if (colisor)
+            {
+                var tamanho = Vector3.Max(Corpo.localScale, colisorMinimo);
+                if (colisor.center != Corpo.localPosition || colisor.size != tamanho)
+                {
+                    colisor.center = Corpo.localPosition;
+                    colisor.size = tamanho;
+                }
+            }
+        }
+
+        void OnEnable()
+        {
+            // Quem estava desligado pode ter perdido mudanças de texto: confere já no primeiro quadro.
+            proximaConferencia = 0f;
+            escalonada = false;
+        }
+
+        void Sincronizar(Bounds medida, string texto)
+        {
+            Verso.text = texto;
+            Ajustar(medida, texto);
         }
 
         /// <summary>Caixa do texto da frente no espaço da raiz (exata para rotações em múltiplos de 90°).</summary>
@@ -157,11 +191,11 @@ namespace SebraeLab.Missions
                 new Vector3(Mathf.Abs(tamanho.x), Mathf.Abs(tamanho.y), Mathf.Abs(tamanho.z)));
         }
 
-        void Ajustar(Bounds medida)
+        void Ajustar(Bounds medida, string texto)
         {
             ultimaMedida = medida;
-            ultimoTexto = Frente.text;
-            int linhas = Mathf.Max(1, Frente.text.Split('\n').Length);
+            ultimoTexto = texto;
+            int linhas = Mathf.Max(1, texto.Split('\n').Length);
             float margem = .5f * medida.size.y / linhas;
             float largura = medida.size.x + 2f * margem;
             float altura = medida.size.y + 2f * margem;

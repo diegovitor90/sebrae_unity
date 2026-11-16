@@ -62,10 +62,17 @@ namespace SebraeLab.Editor
             try
             {
                 // Passos executados no mesmo iterador: uma exceção chega ao finally e o relatório sai mesmo assim.
-                foreach (var passo in new Func<ManagerMission, Relatorio, IEnumerator>[] { Desenho, Paredes, Parada, Caixa, DoisLados, OutroLado })
+                foreach (var passo in new Func<ManagerMission, Relatorio, IEnumerator>[] { Desenho, Paredes, Parada, Caixa, Mural, DoisLados, OutroLado, Memoria })
                 {
                     var e = passo(mission, r);
-                    while (e.MoveNext()) yield return e.Current;
+                    while (true)
+                    {
+                        bool continua;
+                        try { continua = e.MoveNext(); }
+                        catch (Exception erro) { r.Check(false, $"{passo.Method.Name} lançou {erro.GetType().Name}: {erro.Message}"); break; }
+                        if (!continua) break;
+                        yield return e.Current;
+                    }
                 }
                 concluiu = true;
             }
@@ -223,6 +230,47 @@ namespace SebraeLab.Editor
             r.Check(outroMaterial == 0, $"corpo PlacaCorpo e moldura PlacaMoldura em todas ({outroMaterial} com outro material)");
         }
 
+        static readonly Vector3 AreaDeCliqueDoMural = new Vector3(2.1f, .8f, .1f);
+
+        /// <summary>O clique do PC no mural: o colisor nunca fica menor que a área antiga, e cobre a caixa quando ela cresce.</summary>
+        static IEnumerator Mural(ManagerMission mission, Relatorio r)
+        {
+            r.Secao("Mural");
+            yield return null;
+            var texto = Object.FindObjectsByType<TextMesh>(FindObjectsInactive.Include, FindObjectsSortMode.None)
+                .FirstOrDefault(t => t.name == "Placa" && t.text == "MURAL DO CONHECIMENTO");
+            r.Check(texto, "placa \"MURAL DO CONHECIMENTO\" encontrada na cena");
+            if (!texto) yield break;
+            var colisor = texto.GetComponent<BoxCollider>();
+            r.Check(colisor, "o mural tem colisor de clique");
+            if (!colisor) yield break;
+            var corpo = texto.transform.Find("Corpo");
+            r.Check(corpo && corpo.localScale.x < AreaDeCliqueDoMural.x && corpo.localScale.y < AreaDeCliqueDoMural.y,
+                $"com o título, a caixa é menor que a área de clique ({(corpo ? corpo.localScale.x : 0f):0.###} x {(corpo ? corpo.localScale.y : 0f):0.###} m)");
+            r.Check(colisor.size.x >= AreaDeCliqueDoMural.x - .001f && colisor.size.y >= AreaDeCliqueDoMural.y - .001f && colisor.size.z >= AreaDeCliqueDoMural.z - .001f,
+                $"o colisor do mural não fica menor que 2,1 x 0,8 x 0,1 m ({colisor.size.x:0.###} x {colisor.size.y:0.###} x {colisor.size.z:0.###})");
+
+            var copia = CopiarParaOTeste(texto.gameObject);
+            yield return null;
+            var linha = "UMA LINHA LONGA DO MURAL COM MUITO TEXTO PARA PASSAR DA ÁREA DE CLIQUE ANTIGA, LARGA DEMAIS PARA O PAINEL";
+            copia.GetComponent<TextMesh>().text = string.Join("\n", Enumerable.Repeat(linha, 14));
+            yield return new WaitForSeconds(.4f);
+            var colisorDaCopia = copia.GetComponent<BoxCollider>();
+            var corpoDaCopia = copia.transform.Find("Corpo");
+            r.Check(colisorDaCopia && corpoDaCopia, "a cópia do mural tem colisor e corpo");
+            if (colisorDaCopia && corpoDaCopia)
+            {
+                var caixa = corpoDaCopia.localScale;
+                var tamanho = colisorDaCopia.size;
+                r.Check(caixa.x > AreaDeCliqueDoMural.x && caixa.y > AreaDeCliqueDoMural.y,
+                    $"com texto longo, a caixa passa da área antiga ({caixa.x:0.###} x {caixa.y:0.###} m)");
+                r.Check(tamanho.x >= caixa.x - .001f && tamanho.y >= caixa.y - .001f, $"com texto longo, o colisor cobre a caixa ({tamanho.x:0.###} x {tamanho.y:0.###} m)");
+                r.Check(tamanho.x >= AreaDeCliqueDoMural.x - .001f && tamanho.y >= AreaDeCliqueDoMural.y - .001f && tamanho.z >= AreaDeCliqueDoMural.z - .001f,
+                    "com texto longo, o colisor continua no mínimo da área antiga");
+            }
+            Object.Destroy(copia);
+        }
+
         static IEnumerator DoisLados(ManagerMission mission, Relatorio r)
         {
             r.Secao("Dois lados");
@@ -241,8 +289,11 @@ namespace SebraeLab.Editor
             frente.text = "UMA LINHA\nDUAS LINHAS\nTRÊS LINHAS";
             yield return null;
             yield return null;
-            r.Check(verso.text == frente.text, "o verso acompanha quando o texto da frente muda");
-            r.Check(corpo.localScale.y > alturaAntes * 1.5f, $"a caixa cresce com o texto (altura de {alturaAntes:0.###} para {corpo.localScale.y:0.###} m)");
+            r.Check(corpo.localScale.y > alturaAntes * 1.5f, $"a caixa cresce logo que o texto muda (altura de {alturaAntes:0.###} para {corpo.localScale.y:0.###} m em 2 quadros)");
+            // O verso é conferido a cada 0,2 s por placa: 0,4 s cobre a defasagem máxima com folga.
+            yield return new WaitForSeconds(.4f);
+            r.Check(verso.text == frente.text, "o verso acompanha quando o texto da frente muda (em até 0,4 s)");
+            r.Check(corpo.localScale.y > alturaAntes * 1.5f, $"a caixa continua do tamanho do texto (altura de {alturaAntes:0.###} para {corpo.localScale.y:0.###} m)");
             int deTras = ContarBrancos(Renderizar(true));
             r.Check(deTras > 20, $"por trás, o verso aparece ({deTras} pixels brancos)");
             Object.Destroy(copia);
@@ -263,6 +314,40 @@ namespace SebraeLab.Editor
             int diferentes = Diferentes(comVerso, semVerso);
             r.Check(diferentes == 0, $"da frente, o texto do verso não aparece ({diferentes} pixels mudam com e sem ele)");
             Object.Destroy(copia);
+        }
+
+        /// <summary>Limite de lixo gerado pelas placas, em bytes por quadro (todas juntas), definido a partir da medição do código antigo.</summary>
+        const float LimiteDeLixoPorQuadro = 800f;
+
+        /// <summary>
+        /// Lixo por quadro das placas. Medir o quadro inteiro com e sem as placas não serve: a cena já gera de 18 a 24 KB por
+        /// quadro e a variação entre rodadas (vários KB) é maior que o custo das placas. Por isso o LateUpdate de cada placa é
+        /// chamado direto, em laço, e conta-se o crescimento da memória gerenciada em uso (as quedas, que são coletas de
+        /// lixo, são ignoradas). GC.GetAllocatedBytesForCurrentThread devolve 0 no Mono do Unity.
+        /// </summary>
+        static IEnumerator Memoria(ManagerMission mission, Relatorio r)
+        {
+            r.Secao("Memória");
+            for (int i = 0; i < 10; i++) yield return null; // as cópias das seções anteriores já saíram da cena
+            var metodo = typeof(Placa).GetMethod("LateUpdate", System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic);
+            var placas = Object.FindObjectsByType<Placa>(FindObjectsInactive.Include, FindObjectsSortMode.None)
+                .Where(p => p.gameObject.activeInHierarchy).ToList();
+            r.Check(metodo != null && placas.Count > 0, $"{placas.Count} placas ativas e LateUpdate encontrado");
+            if (metodo == null || placas.Count == 0) yield break;
+            var chamadas = placas.Select(p => (Action)Delegate.CreateDelegate(typeof(Action), p, metodo)).ToArray();
+            foreach (var chamada in chamadas) chamada(); // primeira chamada de cada placa fora da medida
+            const int quadros = 200;
+            long cresceu = 0;
+            for (int q = 0; q < quadros; q++)
+            {
+                long antes = UnityEngine.Profiling.Profiler.GetMonoUsedSizeLong();
+                foreach (var chamada in chamadas) chamada();
+                long depois = UnityEngine.Profiling.Profiler.GetMonoUsedSizeLong();
+                if (depois > antes) cresceu += depois - antes;
+            }
+            float porQuadro = cresceu / (float)quadros;
+            r.Info($"{placas.Count} placas: {porQuadro:0} B de lixo por quadro ({quadros} quadros simulados)");
+            r.Check(porQuadro < LimiteDeLixoPorQuadro, $"as placas geram pouco lixo por quadro ({porQuadro:0} B, limite {LimiteDeLixoPorQuadro:0})");
         }
 
         /// <summary>Caixa do texto da frente no espaço da raiz da placa (rotação em múltiplos de 90°).</summary>

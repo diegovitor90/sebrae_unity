@@ -240,8 +240,8 @@ namespace SebraeLab.Missions
             mural=Sign("MURAL DO CONHECIMENTO",new Vector3(22,1.95f,2),.085f);
             // Liberado a partir do Mural: pode ser relido depois, como antes.
             var muralButton=Station("LER O MURAL",new Vector3(22,1,2),()=>{if(!etapas.Alcancou(EtapaExpediente.Mural))return;mural.text="SEBRAE LAB\nUm espaço para experimentar ideias,\ntrocar experiências e aprender em grupo.";confirm.SetActive(true);Cursor.lockState=CursorLockMode.None;},EtapaExpediente.Mural);
-            var panelHit=mural.gameObject.AddComponent<BoxCollider>();
-            panelHit.size=new Vector3(2.1f,.8f,.1f);
+            mural.gameObject.AddComponent<BoxCollider>();
+            mural.GetComponent<Placa>().colisorMinimo=new Vector3(2.1f,.8f,.1f); // área de clique do PC: nunca menor que a de antes
             stations[mural.gameObject]=stations[muralButton];
             confirm=Station("ENTENDIDO",new Vector3(23.8f,1,2),()=>{confirm.SetActive(false);Cursor.lockState=CursorLockMode.Locked;if(!etapas.Em(EtapaExpediente.Mural))return;etapas.Concluir(EtapaExpediente.Mural);coffee.enabled=true;coffeeSpot.SetActive(true);mural.text="MURAL DO CONHECIMENTO";});confirm.SetActive(false);
             Shape("Balcão da copa",new Vector3(26,.45f,3),new Vector3(2,.9f,.8f),teal);
