@@ -27,24 +27,31 @@ namespace SebraeLab.Editor
         const float DegrauEsperado = .15f; // degrau do jogador; a barra da entrada fica a 2,01 m do chão
         const float Grade = .2f;
 
-        static readonly string[] PisosCobertos =
-            { "Piso - Teletransporte", "Galeria da praça", "Piso do escritório", "Ala de atividades", "Galeria de descompressão", "Sala de descompressão" };
+        static readonly string[] PisosCobertos = { "Piso - Teletransporte", "Sala de descompressão" };
 
         static readonly Vector3[] Rota =
         {
-            new Vector3(5.7f, 0, 7.1f), new Vector3(3.4f, 0, 6.7f), new Vector3(5.7f, 0, 8f),
-            new Vector3(6, 0, 10), new Vector3(9, 0, 11), new Vector3(12, 0, 11), new Vector3(14, 0, 10),
-            new Vector3(14, 0, 7), new Vector3(14, 0, 4), new Vector3(14, 0, 1), new Vector3(15, 0, 0),
-            new Vector3(17, 0, 0), new Vector3(19, 0, 0), new Vector3(21, 0, 0), new Vector3(26, 0, 0), new Vector3(31, 0, 0),
-            new Vector3(33, 0, 0), new Vector3(40, 0, 0), new Vector3(42, 0, 0), new Vector3(42, 0, -5), new Vector3(48, 0, -5), new Vector3(48, 0, 0),
-            new Vector3(42, 0, -5), new Vector3(40, 0, 0), new Vector3(26, 0, 0), new Vector3(17, 0, 0), new Vector3(14, 0, 4), new Vector3(9, 0, 11), new Vector3(5.7f, 0, 7.1f),
+            PlantaDaTrilha.Nascimento, PlantaDaTrilha.FeixeDoGerente, new Vector3(4.1f, 0, 6.3f), new Vector3(2.4f, 0, 1f), new Vector3(1.4f, 0, -4f),
+            PlantaDaTrilha.FeixeDoPires, new Vector3(1.4f, 0, -4f), PlantaDaTrilha.FeixeDoMural, PlantaDaTrilha.FeixeDaBancada,
+            new Vector3(1.4f, 0, -6f), new Vector3(1.2f, 0, -8.1f), new Vector3(.1f, 0, -7.9f), new Vector3(.1f, 0, -6.9f),
+            new Vector3(-4.6f, 0, -6.85f), new Vector3(.1f, 0, -6.9f), new Vector3(1.2f, 0, -8.1f), PlantaDaTrilha.FeixeDaPortaDosFundos,
+            PlantaDaTrilha.ChegadaDosFundos, new Vector3(-3f, 0, -12.5f), PlantaDaTrilha.ChegadaDosFundos,
+            // (2,4; 4,6): sobe pelo lado oeste do pufe junto à fachada (3,55; 3,22), que o planejador da grade não enxerga.
+            new Vector3(1.4f, 0, -6f), new Vector3(2.4f, 0, 1f), new Vector3(2.4f, 0, 4.6f), PlantaDaTrilha.Nascimento,
+        };
+
+        static readonly Vector3[] RotaDaDescompressao =
+        {
+            PlantaDaTrilha.EntradaDaDescompressao, PlantaDaTrilha.NaDescompressao(new Vector3(42, 0, -5)),
+            PlantaDaTrilha.NaDescompressao(new Vector3(48, 0, -5)), PlantaDaTrilha.NaDescompressao(new Vector3(48, 0, 0)),
+            PlantaDaTrilha.EntradaDaDescompressao,
         };
 
         static readonly (string nome, Vector3 ponto)[] Ambientes =
         {
-            ("Recepção", new Vector3(5.7f, 0, 7.1f)), ("Praça", new Vector3(9, 0, 11)), ("Galeria da praça", new Vector3(14, 0, 2.5f)),
-            ("Sala 2", new Vector3(18, 0, 0)), ("Ala de atividades", new Vector3(26, 0, 0)),
-            ("Galeria de descompressão", new Vector3(36.5f, 0, 0)), ("Descompressão", new Vector3(48, 0, -5)),
+            ("Recepção", PlantaDaTrilha.Nascimento), ("Sala 2", PlantaDaTrilha.FeixeDoPires), ("Corredor", new Vector3(2.2f, 0, -6f)),
+            ("Sala de aula", new Vector3(-3f, 0, -6.85f)), ("Fundos", new Vector3(0f, 0, -12f)),
+            ("Descompressão", PlantaDaTrilha.NaDescompressao(new Vector3(48, 0, -5))),
         };
 
         sealed class Relatorio
@@ -89,6 +96,8 @@ namespace SebraeLab.Editor
             var r = new Relatorio();
             r.Texto.AppendLine("Navegação, tetos e luzes • " + DateTime.Now);
             yield return null;
+            mission.day.LiberarDescompressao(); // porta dos fundos aberta e descompressão ligada para o teste
+            yield return new WaitForSeconds(PlantaDaTrilha.TempoDaPortaDeVidro + .3f);
 
             Secao(r, "Locomoção", Locomocao);
             Secao(r, "Iluminação", Iluminacao);
@@ -150,8 +159,6 @@ namespace SebraeLab.Editor
 
             var porta = Object.FindFirstObjectByType<HandDoor>();
             if (porta && !porta.IsOpen) { porta.Toggle(); yield return new WaitForSeconds(1f); }
-            var portao = GameObject.Find("Porta da descompressão");
-            if (portao) { portao.SetActive(false); r.Info("Porta da descompressão aberta para o teste"); }
 
             var corpo = new GameObject("Corpo de teste (rig VR)").AddComponent<CharacterController>();
             corpo.radius = rig.radius; corpo.stepOffset = rig.stepOffset; corpo.slopeLimit = rig.slopeLimit; corpo.skinWidth = rig.skinWidth;
@@ -168,7 +175,19 @@ namespace SebraeLab.Editor
                 if (estado.Erro == null) r.Ok($"trecho {i}: chegou a {Fmt(Rota[i])}");
             }
             if (estado.Erro != null) r.Falha("rota: " + estado.Erro);
-            r.Info($"Maior subida em um passo: {estado.MaiorSubida:0.###} m, em {Fmt(estado.OndeSubiu)}");
+            // A descompressão provisória é alcançada por deslocamento (botão nos fundos), não a pé.
+            corpo.enabled = false;
+            corpo.transform.position = RotaDaDescompressao[0];
+            corpo.enabled = true;
+            Physics.SyncTransforms();
+            var naDescompressao = new Caminhada();
+            for (int i = 1; i < RotaDaDescompressao.Length && naDescompressao.Erro == null; i++)
+            {
+                yield return Andar(corpo, RotaDaDescompressao[i], naDescompressao);
+                if (naDescompressao.Erro == null) r.Ok($"descompressão, trecho {i}: chegou a {Fmt(RotaDaDescompressao[i])}");
+            }
+            if (naDescompressao.Erro != null) r.Falha("rota da descompressão: " + naDescompressao.Erro);
+            r.Info($"Maior subida em um passo: {Mathf.Max(estado.MaiorSubida, naDescompressao.MaiorSubida):0.###} m");
             Object.Destroy(corpo.gameObject);
         }
 
@@ -197,7 +216,8 @@ namespace SebraeLab.Editor
 
             var luminarias = Object.FindObjectsByType<MeshRenderer>(FindObjectsSortMode.None).Where(m => m.name == "Luminária").ToArray();
             var semEmissao = luminarias.Where(m => !m.sharedMaterial || m.sharedMaterial.name != "LuminariaAcesa").ToArray();
-            if (luminarias.Length > 0 && semEmissao.Length == 0) r.Ok($"{luminarias.Length} luminárias com o material LuminariaAcesa");
+            if (luminarias.Length == 0) r.Ok("sem luminárias de teto da trilha antiga; a trilha usa a luz do prédio");
+            else if (semEmissao.Length == 0) r.Ok($"{luminarias.Length} luminárias com o material LuminariaAcesa");
             else r.Falha($"{semEmissao.Length} de {luminarias.Length} luminárias sem o material LuminariaAcesa");
 
             // Em Play, nem o objeto em memória nem o carregado do asset trazem a tabela por plataforma

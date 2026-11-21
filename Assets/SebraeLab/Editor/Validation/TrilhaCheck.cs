@@ -37,7 +37,7 @@ namespace SebraeLab.Editor
 
         /// <summary>Seções, na ordem em que rodam. Cada tarefa do plano acrescenta as suas.</summary>
         static readonly Func<ManagerMission, Relatorio, IEnumerator>[] Passos = { Abertura, Sala2, MuralECafe, Organizacao, Vestigios, Guia, Seta, ForaDeOrdem,
-            PortaDosFundos, Descompressao, PaineisEParedes, Simulador, Orcamento };
+            PortaDosFundos, Caminhada, Descompressao, PaineisEParedes, Simulador, Orcamento };
 
         static TrilhaCheck() { EditorApplication.update += Poll; }
 
@@ -243,6 +243,49 @@ namespace SebraeLab.Editor
             r.Check(Caminho(mission, corredor, fundos, out var d), $"aberta, chega-se aos fundos a pé ({d:0.#} m)");
             r.Check(botao && botao.activeSelf, "o botão da descompressão aparece");
             r.Check(AcharPlaca("DESCOMPRESSÃO   •   ENTRADA LIBERADA"), "a placa da porta diz que a entrada foi liberada");
+        }
+
+        static IEnumerator Caminhada(ManagerMission mission, Relatorio r)
+        {
+            r.Secao("Caminhada");
+            yield return null;
+            var porta = Object.FindFirstObjectByType<HandDoor>();
+            if (porta && !porta.IsOpen) { porta.Toggle(); yield return new WaitForSeconds(1f); }
+            var paradas = new List<(string nome, Vector3 ponto)>
+            {
+                ("nascimento", PlantaDaTrilha.Nascimento), ("gerente", PlantaDaTrilha.FeixeDoGerente),
+                ("porta da Sala 2", PlantaDaTrilha.FeixeDaPortaDaSala2), ("dentro da Sala 2", PlantaDaTrilha.FeixeDoPires),
+                ("mural", PlantaDaTrilha.FeixeDoMural), ("bancada", PlantaDaTrilha.FeixeDaBancada), ("pires", PlantaDaTrilha.FeixeDoPires),
+            };
+            for (int i = 0; i < 2; i++)
+            {
+                paradas.Add(($"livro {i + 1}", PlantaDaTrilha.ChaoDiante(PlantaDaTrilha.InicioDosLivros[i])));
+                paradas.Add(("estante", PlantaDaTrilha.ChaoDiante(PlantaDaTrilha.DestinoDosLivros[i])));
+            }
+            for (int i = 0; i < 2; i++)
+            {
+                paradas.Add(($"cadeira {i + 1}", PlantaDaTrilha.ChaoDiante(PlantaDaTrilha.InicioDasCadeiras[i])));
+                paradas.Add(($"lugar {i + 1}", PlantaDaTrilha.ChaoDiante(PlantaDaTrilha.DestinoDasCadeiras[i])));
+            }
+            for (int i = 0; i < 2; i++)
+            {
+                paradas.Add(($"notebook {i + 1}", PlantaDaTrilha.ChaoDiante(PlantaDaTrilha.InicioDosNotebooks[i])));
+                paradas.Add(($"mesa {i + 1}", PlantaDaTrilha.ChaoDiante(PlantaDaTrilha.DestinoDosNotebooks[i])));
+            }
+            paradas.Add(("porta dos fundos", PlantaDaTrilha.FeixeDaPortaDosFundos));
+            paradas.Add(("botão da descompressão", PlantaDaTrilha.FeixeDoBotaoDaDescompressao));
+            mission.day.LiberarDescompressao();
+            yield return new WaitForSeconds(PlantaDaTrilha.TempoDaPortaDeVidro + .3f);
+            float total = 0f;
+            for (int i = 1; i < paradas.Count; i++)
+            {
+                bool ok = Caminho(mission, paradas[i - 1].ponto, paradas[i].ponto, out var d);
+                r.Check(ok && d <= PlantaDaTrilha.LimiteDoTrecho,
+                    $"{paradas[i - 1].nome} → {paradas[i].nome}: {(ok ? d.ToString("0.#") + " m" : "sem caminho")}");
+                total += d;
+                if (i % 4 == 0) yield return null;
+            }
+            r.Check(total <= PlantaDaTrilha.LimiteDaCaminhada, $"caminhada total {total:0} m (limite {PlantaDaTrilha.LimiteDaCaminhada:0} m)");
         }
 
         static IEnumerator Vestigios(ManagerMission mission, Relatorio r)
