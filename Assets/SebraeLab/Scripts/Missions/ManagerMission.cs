@@ -28,7 +28,7 @@ namespace SebraeLab.Missions
         public string[] dialogue = {
             "Olá! Bem-vindo ao Sebrae Lab. Sou o gestor do espaço. Vamos começar seu primeiro dia?",
             "Aqui você encontra espaços de trabalho, troca de ideias e aprendizado. Seu primeiro desafio é conhecer sua sala.",
-            "Sua sala está sinalizada ao fundo, à esquerda do corredor. Siga as marcações azuis e entre na área indicada."
+            "Sua sala é a Sala 2, no corredor do fundo do prédio. Siga a luz dourada até a porta e abra pela maçaneta amarela."
         };
 
         public ManagerMissionState State { get; private set; }
@@ -44,7 +44,7 @@ namespace SebraeLab.Missions
             // Retorno de hover e clique no botão do painel. Configurado na cena pelo Inspector, é respeitado.
             if (conversationButton && !conversationButton.GetComponent<MissionButton>())
                 conversationButton.gameObject.AddComponent<MissionButton>();
-            day =gameObject.AddComponent<InternshipDay>(); day.Initialize(this); dialogue[dialogue.Length-1]="Seu escritório fica na galeria ao lado da praça. Siga as marcas até a porta da Sala 2. A sala de aula fica logo depois do escritório."; RestartMission(); }
+            day =gameObject.AddComponent<InternshipDay>(); day.Initialize(this); dialogue[dialogue.Length-1]="Sua sala é a Sala 2, no corredor do fundo do prédio. Siga a luz dourada até a porta e abra pela maçaneta amarela."; RestartMission(); }
         void Update()
         {
 #if UNITY_EDITOR || UNITY_STANDALONE
@@ -172,11 +172,11 @@ namespace SebraeLab.Missions
                     break;
                 case ManagerMissionState.FindRoom:
                     if (objectiveText) objectiveText.text = "OBJETIVO | ENCONTRE SUA SALA";
-                    if (dialogueText) dialogueText.text = "Siga as marcações azuis pelo corredor. Segure a maçaneta amarela, abra a porta e entre na sala.";
+                    if (dialogueText) dialogueText.text = "Siga a luz dourada até a Sala 2. Segure a maçaneta amarela, abra a porta e entre na sala.";
                     break;
                 case ManagerMissionState.Completed:
                     if (objectiveText) objectiveText.text = "MISSÃO CONCLUÍDA";
-                    if (dialogueText) dialogueText.text = "Atravesse o escritório e siga a placa Sala de aula até o mural.";
+                    if (dialogueText) dialogueText.text = "Saia da sala e leia o Mural do Conhecimento, na parede em frente.";
                     break;
             }
         }

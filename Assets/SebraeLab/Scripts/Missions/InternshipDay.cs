@@ -195,7 +195,7 @@ namespace SebraeLab.Missions
             }
             floor.AddComponent<TeleportationArea>().interactionLayers=(UnityEngine.XR.Interaction.Toolkit.InteractionLayerMask)(1<<31);
             foreach(int s in new[]{-1,1}){
-                bool passage=name=="Ala de atividades" || s==-1;
+                bool passage=s==-1; // passagem na parede oeste, a da entrada
                 if(passage){
                     float segment=(depth-2.4f)*.5f;
                     foreach(int end in new[]{-1,1})
@@ -333,13 +333,13 @@ namespace SebraeLab.Missions
             switch(mission.State){
                 case ManagerMissionState.FindManager:return "1/5   •   Recepção\nAproxime-se do gerente e pressione F.";
                 case ManagerMissionState.Dialogue:return "1/5   •   Conversa\nPressione F para continuar e aceitar o estágio.";
-                case ManagerMissionState.FindRoom:return DoorOpen?"2/5   •   Sala 2\nAtravesse a porta para conhecer seu escritório.":"2/5   •   Sala 2\nSiga as marcas pela praça e clique na maçaneta.";
+                case ManagerMissionState.FindRoom:return DoorOpen?"2/5   •   Sala 2\nAtravesse a porta para conhecer sua sala.":"2/5   •   Sala 2\nSiga a luz até a porta e clique na maçaneta.";
             }
-            if(etapas.Em(EtapaExpediente.Mural))return confirm.activeSelf?"3/5   •   Mural\nLeia o painel e clique em Entendido.":"3/5   •   Mural\nAtravesse o escritório e clique em Ler o mural.";
-            if(etapas.Em(EtapaExpediente.Cafe) && coffeeCollected)return "4/5   •   Entregue o café na Sala 2\nMire no pires da mesa do escritório e clique para soltar.";
-            if(etapas.Em(EtapaExpediente.Cafe))return "4/5   •   Copa\nPegue o copo no balcão com o clique esquerdo.";
+            if(etapas.Em(EtapaExpediente.Mural))return confirm.activeSelf?"3/5   •   Mural\nLeia o painel e clique em Entendido.":"3/5   •   Mural\nSaia da sala e clique em Ler o mural.";
+            if(etapas.Em(EtapaExpediente.Cafe) && coffeeCollected)return "4/5   •   Entregue o café na Sala 2\nMire no pires da mesa e clique para soltar.";
+            if(etapas.Em(EtapaExpediente.Cafe))return "4/5   •   Copa\nPegue o copo na bancada com o clique esquerdo.";
             if(etapas.Em(EtapaExpediente.Organizacao))return "5/5   •   "+jobs[placed/2]+"   "+(placed%2)+"/2\nPegue o objeto e solte na marca com o mesmo número.";
-            return "Expediente concluído\nSiga o corredor até a sala de descompressão.";
+            return "Expediente concluído\nA porta dos fundos abriu. Siga a luz até a descompressão.";
         }
         void Delivery(string name,Vector3 p,Vector3 target,Vector3 size,Color color,int kind)
         {

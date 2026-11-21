@@ -1,5 +1,7 @@
 using System.IO;
+using System.Linq;
 using System.Text;
+using System.Text.RegularExpressions;
 using UnityEditor;
 using UnityEngine;
 using SebraeLab.Missions;
@@ -107,6 +109,20 @@ namespace SebraeLab.Editor
                 "descompressão deslocada para trás da parede sul");
             Check(!PlantaDaTrilha.Predio.Intersects(new Bounds(PlantaDaTrilha.NaDescompressao(new Vector3(48f, 1.5f, 0f)), new Vector3(14f, 3f, 16f))),
                 "a descompressão provisória fica toda fora do prédio");
+
+            texto.AppendLine().AppendLine("== Textos");
+            var caminhoAntigo = new[] { @"\bpraça\b", @"\bgaleria\b", @"\bala\b", @"marcas azuis", @"marcações azuis", @"\bcoworking\b" };
+            foreach (var arquivo in new[]
+            {
+                "Assets/SebraeLab/Scripts/Missions/InternshipDay.cs",
+                "Assets/SebraeLab/Scripts/Missions/ManagerMission.cs",
+                "Assets/SebraeLab/Scripts/Missions/MissionManager.cs",
+            })
+            {
+                var literais = Regex.Matches(File.ReadAllText(arquivo), "\"((?:[^\"\\\\]|\\\\.)*)\"").Cast<Match>().Select(m => m.Groups[1].Value);
+                var achados = literais.Where(l => caminhoAntigo.Any(p => Regex.IsMatch(l, p, RegexOptions.IgnoreCase))).ToList();
+                Check(achados.Count == 0, $"{Path.GetFileName(arquivo)}: nenhum texto fala do caminho antigo ({string.Join(" | ", achados.Take(3))})");
+            }
 
             texto.AppendLine().AppendLine(falhas == 0 ? "RESULTADO: OK" : $"RESULTADO: FALHA ({falhas})");
             Directory.CreateDirectory("Logs");
