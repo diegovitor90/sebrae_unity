@@ -123,7 +123,7 @@ namespace SebraeLab.Missions
         /// </summary>
         public static Vector3 ChaoDiante(Vector3 ponto) =>
             SalaDeAula.Contains(new Vector3(ponto.x, 1.4f, ponto.z))
-                ? new Vector3(Mathf.Max(ponto.x, -4.6f), 0f, -6.85f)
+                ? new Vector3(Mathf.Max(ponto.x, -4.5f), 0f, -6.85f)
                 : new Vector3(ponto.x, 0f, ponto.z);
 
         // ---------------------------------------------------------------- Caminhada (grade de 20 cm, quatro direções)

@@ -55,7 +55,7 @@ namespace SebraeLab.Editor
             Check(Igual(GuiaDaTrilha.Destino(livro), new Vector3(-3.7f, 0f, -6.85f)),
                 "organização, mão vazia: feixe no corredor interno, na altura do livro 1");
             livro.DestinoDoItemNaMao = PlantaDaTrilha.DestinoDosLivros[0];
-            Check(Igual(GuiaDaTrilha.Destino(livro), new Vector3(-4.6f, 0f, -6.85f)),
+            Check(Igual(GuiaDaTrilha.Destino(livro), new Vector3(-4.5f, 0f, -6.85f)),
                 "livro na mão: feixe diante da estante, sem encostar na parede");
             var cadeira = Estado(Concluido, EtapaExpediente.Organizacao);
             cadeira.ProximoItem = PlantaDaTrilha.InicioDasCadeiras[0];
