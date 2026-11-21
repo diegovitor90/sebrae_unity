@@ -34,7 +34,7 @@ namespace SebraeLab.Editor
         }
 
         /// <summary>Seções, na ordem em que rodam. Cada tarefa do plano acrescenta as suas.</summary>
-        static readonly Func<ManagerMission, Relatorio, IEnumerator>[] Passos = { Abertura };
+        static readonly Func<ManagerMission, Relatorio, IEnumerator>[] Passos = { Abertura, Sala2, MuralECafe, Organizacao, PortaDosFundos };
 
         static TrilhaCheck() { EditorApplication.update += Poll; }
 
@@ -151,6 +151,96 @@ namespace SebraeLab.Editor
         }
 
         static bool DaFachada(Collider c) => c && c.transform.parent && c.transform.parent.name == PlantaDaTrilha.NomeDaFachada;
+
+        static IEnumerator Sala2(ManagerMission mission, Relatorio r)
+        {
+            r.Secao("Sala 2");
+            yield return null;
+            var porta = Object.FindFirstObjectByType<HandDoor>();
+            r.Check(porta, "a porta da Sala 2 existe");
+            if (!porta) yield break;
+            r.Check(Distancia2D(porta.transform.position, PlantaDaTrilha.Dobradica) < .05f, $"dobradiça no vão da Sala A {Fmt(porta.transform.position)}");
+            var fora = PlantaDaTrilha.FeixeDaPortaDaSala2;
+            var dentro = PlantaDaTrilha.FeixeDoPires;
+            r.Check(!Caminho(mission, fora, dentro, out _), "com a porta fechada, não se entra na Sala 2");
+            porta.Toggle();
+            yield return new WaitForSeconds(1f);
+            var painel = porta.transform.Find("Porta • sala do estagiário");
+            r.Check(porta.IsOpen, "a porta abre");
+            r.Check(painel && PlantaDaTrilha.Sala2.Contains(painel.GetComponent<Renderer>().bounds.center), "aberta, a porta fica dentro da Sala A");
+            r.Check(Caminho(mission, fora, dentro, out var d), $"com a porta aberta, entra-se na Sala 2 ({d:0.#} m)");
+            r.Check(PlantaDaTrilha.Sala2.Contains(mission.room.transform.position + Vector3.up), "a área de conclusão fica dentro da Sala A");
+            var placa = AcharPlaca("SALA 2");
+            r.Check(placa && Mathf.Abs(Mathf.DeltaAngle(placa.eulerAngles.y, 270f)) < .5f, "placa SALA 2 lida por quem está no corredor");
+            r.Check(mission.routeMarkers.transform.childCount == 0 || mission.routeMarkers.GetComponentsInChildren<Renderer>().Length == 0,
+                "as marcas azuis da cena antiga saíram");
+            porta.Toggle(); // volta fechada para as seções seguintes
+            yield return new WaitForSeconds(1f);
+        }
+
+        static IEnumerator MuralECafe(ManagerMission mission, Relatorio r)
+        {
+            r.Secao("Mural e café");
+            yield return null;
+            var mural = AcharPlaca("MURAL DO CONHECIMENTO");
+            r.Check(mural && Vector3.Distance(mural.position, PlantaDaTrilha.Mural) < .05f && Mathf.Abs(Mathf.DeltaAngle(mural.eulerAngles.y, 90f)) < .5f,
+                "mural na parede leste, lido por quem olha para leste");
+            r.Check(!GameObject.Find(PlantaDaTrilha.QuadroQueSai), "o quadro decorativo saiu do lugar do mural");
+            var copo = GameObject.Find("Copo de café");
+            r.Check(copo && PlantaDaTrilha.Copa.Contains(copo.transform.position), "copo de café na copa");
+            r.Check(copo && Physics.Raycast(copo.transform.position, Vector3.down, out var apoio, .3f, ~0, QueryTriggerInteraction.Ignore)
+                && apoio.collider.name == "Bancada Cozinha", "o copo está apoiado na bancada original da copa");
+            var pires = AcharObjeto("Pires • café");
+            r.Check(pires && PlantaDaTrilha.Sala2.Contains(pires.position), "pires sobre a mesa da Sala 2");
+            var status = Object.FindObjectsByType<TextMesh>(FindObjectsInactive.Include, FindObjectsSortMode.None)
+                .FirstOrDefault(t => t.name == "Placa" && Vector3.Distance(t.transform.position, PlantaDaTrilha.PlacaDoExpediente) < .05f);
+            r.Check(status, "placa do expediente na entrada do corredor");
+            r.Check(AcharPlaca("MESA DE INOVAÇÃO") && AcharObjeto("Cartilha de inovação") && AcharObjeto("Protótipo"),
+                "mesa de inovação sobre a Mesa Grande, com cartilha e protótipo");
+        }
+
+        static IEnumerator Organizacao(ManagerMission mission, Relatorio r)
+        {
+            r.Secao("Organização");
+            yield return null;
+            var corpos = Object.FindObjectsByType<Rigidbody>(FindObjectsInactive.Include, FindObjectsSortMode.None);
+            foreach (var nome in new[] { "Livro", "Cadeira", "Notebook" })
+            {
+                var itens = corpos.Where(b => b.name == nome).ToList();
+                r.Check(itens.Count == 2 && itens.All(i => PlantaDaTrilha.SalaDeAula.Contains(i.position)), $"{nome}: 2 itens, começando na sala de aula");
+                var marcas = Object.FindObjectsByType<MeshRenderer>(FindObjectsInactive.Include, FindObjectsSortMode.None)
+                    .Where(m => m.name == "Destino • " + nome).ToList();
+                r.Check(marcas.Count == 2 && marcas.All(m => PlantaDaTrilha.SalaDeAula.Contains(m.transform.position)), $"{nome}: 2 destinos na sala de aula");
+            }
+            r.Check(Caminho(mission, new Vector3(1.4f, 0f, -8.1f), new Vector3(-.2f, 0f, -6.85f), out var entrada),
+                $"da porta ao corredor interno, passando pelas cadeiras ({entrada:0.#} m)");
+            r.Check(Caminho(mission, new Vector3(-.2f, 0f, -6.85f), new Vector3(-4.6f, 0f, -6.85f), out var interno),
+                $"o corredor interno vai até a estante ({interno:0.#} m)");
+            r.Check(!AcharObjeto("Ala de atividades") && !AcharObjeto("Galeria da praça"), "a ala e a galeria de fora saíram");
+        }
+
+        static IEnumerator PortaDosFundos(ManagerMission mission, Relatorio r)
+        {
+            r.Secao("Porta dos fundos");
+            yield return null;
+            var corredor = new Vector3(2.2f, 0f, -6f);
+            var fundos = PlantaDaTrilha.ChegadaDosFundos;
+            var botao = Peca("SALA DE DESCOMPRESSÃO");
+            r.Check(!mission.day.PortaDosFundosAberta, "a porta começa trancada");
+            r.Check(!Caminho(mission, corredor, fundos, out _), "trancada, não há caminho do corredor aos fundos (frestas fechadas)");
+            r.Check(botao && !botao.activeSelf, "o botão da descompressão começa escondido");
+            var vidro = GameObject.Find(PlantaDaTrilha.NomeDaPortaDeVidro);
+            float xAntes = vidro ? Limites(vidro).center.x : float.NaN; // o pivô do FBX fica longe da porta: mede o vidro visível
+            mission.day.LiberarDescompressao();
+            yield return new WaitForSeconds(PlantaDaTrilha.TempoDaPortaDeVidro + .3f);
+            r.Check(mission.day.PortaDosFundosAberta, "LiberarDescompressao abre a porta");
+            r.Check(vidro && GameObjectUtility.GetStaticEditorFlags(vidro) == 0, "a porta de vidro não tem marca de estático (senão não desliza em Play)");
+            float xDepois = vidro ? Limites(vidro).center.x : float.NaN;
+            r.Check(vidro && Mathf.Abs(xAntes - xDepois - PlantaDaTrilha.CursoDaPortaDeVidro) < .05f, $"a porta de vidro deslizou para oeste (centro de {xAntes:0.##} para {xDepois:0.##})");
+            r.Check(Caminho(mission, corredor, fundos, out var d), $"aberta, chega-se aos fundos a pé ({d:0.#} m)");
+            r.Check(botao && botao.activeSelf, "o botão da descompressão aparece");
+            r.Check(AcharPlaca("DESCOMPRESSÃO   •   ENTRADA LIBERADA"), "a placa da porta diz que a entrada foi liberada");
+        }
 
         // ------------------------------------------------------------------------------------------- Ajudantes
 

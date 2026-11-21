@@ -18,15 +18,21 @@ namespace SebraeLab.Missions
         readonly List<Action> pending = new List<Action>();
         Transform area;
         TextMesh status, mural;
-        GameObject confirm, entry, lounge;
-        GameObject loungeGate, coffeeSpot;
+        GameObject confirm, coffeeSpot, botaoDescompressao;
+        PortaDeVidro portaDeVidro;
+        TextMesh placaDaPorta;
+        bool portaDosFundosAberta;
+        // Organização: item que está na mão e itens ainda não entregues, por tipo (livro, cadeira, notebook).
+        GameObject itemNaMao;
+        readonly List<GameObject>[] itens={new List<GameObject>(),new List<GameObject>(),new List<GameObject>()};
+        public bool PortaDosFundosAberta => portaDosFundosAberta;
         XRGrabInteractable coffee;
         bool coffeeCollected;
         readonly Dictionary<GameObject,GameObject> assigned=new Dictionary<GameObject,GameObject>();
         public GameObject Destination(GameObject item) => assigned.TryGetValue(item,out var spot) && spot.activeInHierarchy ? spot : null;
         public bool Reading => confirm && confirm.activeSelf;
         public void ConfirmReading(){if(Reading)UseStation(confirm);}
-        public void ReturnToStart(){Move(new Vector3(5.7f,0,7.1f));}
+        public void ReturnToStart(){Move(PlantaDaTrilha.Nascimento);}
         int placed;
         const int ItemCount = 6;
         // Etapa atual, objetivo e avisos. Aparece igual na placa de status (Quest) e no HUD do PC.
@@ -39,75 +45,57 @@ namespace SebraeLab.Missions
             area = new GameObject("Missão Estágio • percurso").transform;
             Sign("PRIMEIRO DIA\nProcure o gestor do espaço",new Vector3(3.9f,1.9f,7.4f),.067f,270f); // lida por quem nasce a leste, olhando para o gerente (−X)
             Music();
-            hinge = new GameObject("Dobradiça da sala").transform;
-            door = hinge.gameObject.AddComponent<HandDoor>();
-            var office = new GameObject("Sala do estagiário").transform;
-            office.SetParent(area,false);
-            office.SetPositionAndRotation(new Vector3(16,0,0), Quaternion.Euler(0,-90,0));
-            mission.room.transform.position = new Vector3(17,0,0);
-            mission.roomMarker.transform.position += mission.room.transform.position - new Vector3(-3,0,-5);
-            foreach(Transform mark in mission.routeMarkers.transform) mark.gameObject.SetActive(false);
-            foreach(var waypoint in new[]{new Vector3(5.7f,0,8),new Vector3(6,0,10),new Vector3(9,0,11),new Vector3(12,0,11),new Vector3(14,0,10),new Vector3(14,0,7),new Vector3(14,0,4),new Vector3(14,0,1),new Vector3(15,0,0)})
-                Shape("Marca de percurso",waypoint+Vector3.up*.015f,new Vector3(.30f,.018f,.30f),teal,parent:mission.routeMarkers.transform);
-            PassageFloor("Galeria da praça",new Vector3(14,-.11f,2.5f),new Vector3(4,.20f,9));
-            PassageFloor("Piso do escritório",new Vector3(18,-.1f,0),new Vector3(4,.2f,5.2f));
-            PassageFloor("Galeria de descompressão",new Vector3(36.5f,-.1f,0),new Vector3(9,.2f,3.2f));
-            foreach(int side in new[]{-1,1})
-                Shape("Parede lateral",new Vector3(36.5f,1.45f,side*1.60f),new Vector3(9,2.9f,.12f),teal);
-            Sign("ESCRITÓRIO   •   SALA 2",new Vector3(15.9f,2.38f,0),.09f);
-            Sign("SALA 2   →   ALA DE AULAS",new Vector3(13.8f,1.9f,9),.09f);
-            BuildOffice(office);
-            hinge.SetParent(office,false);
-            hinge.localPosition = Vector3.left * .56f;
-            foreach(float x in new[]{-.055f,1.17f})
-                Shape("Batente",hinge.localPosition+new Vector3(x,1.09f,0),new Vector3(.10f,2.18f,.15f),navy,parent:office);
-            Shape("Batente",hinge.localPosition+new Vector3(.56f,2.14f,0),new Vector3(1.32f,.11f,.15f),navy,parent:office);
-            var doorPanel = Shape("Porta • sala do estagiário", new Vector3(.56f,1.04f,0),new Vector3(1.12f,2.08f,.07f),teal,parent:hinge);
-            var knob = Shape("Maçaneta",new Vector3(.99f,1,.12f),new Vector3(.22f,.09f,.17f),gold,parent:hinge);
+            // A trilha acontece dentro do prédio: as marcas azuis e a placa "SUA SALA" da cena saem (os objetos ficam, vazios).
+            foreach(Transform mark in mission.routeMarkers.transform) Destroy(mark.gameObject);
+            foreach(Transform mark in mission.roomMarker.transform) Destroy(mark.gameObject);
+            MontarSala2();
+            manager.onCompleted.AddListener(()=>etapas.Concluir(EtapaExpediente.Sala));
+            gameObject.AddComponent<LabPlaza>().Build();
+            MontarMural();
+            MontarCafe();
+            MontarOrganizacao();
+            MontarFundos();
+            BuildLounge();
+            Station("RECOMEÇAR O DIA",new Vector3(50,1,-6),()=>UnityEngine.SceneManagement.SceneManager.LoadScene(gameObject.scene.name));
+        }
+        /// <summary>Sala 2 na Sala A do prédio: porta com maçaneta no vão do corredor e o conteúdo do escritório antigo.</summary>
+        void MontarSala2()
+        {
+            var sala=new GameObject("Sala 2 • porta").transform;
+            sala.SetParent(area,false);
+            sala.SetPositionAndRotation(PlantaDaTrilha.Dobradica,Quaternion.Euler(0f,PlantaDaTrilha.GuinadaDaPorta,0f));
+            hinge=new GameObject("Dobradiça da sala").transform;
+            hinge.SetParent(sala,false);
+            door=hinge.gameObject.AddComponent<HandDoor>();
+            float largura=PlantaDaTrilha.LarguraDaPorta;
+            Shape("Porta • sala do estagiário",new Vector3(largura/2f,1.04f,0),new Vector3(largura,2.08f,.07f),teal,parent:hinge);
+            var knob=Shape("Maçaneta",new Vector3(largura-.13f,1,.12f),new Vector3(.22f,.09f,.17f),gold,parent:hinge);
             var insideHandle=Shape("Maçaneta interna",new Vector3(0,0,-1.42f),Vector3.one,gold,parent:knob.transform);
-            var grip = knob.AddComponent<XRSimpleInteractable>();
+            var grip=knob.AddComponent<XRSimpleInteractable>();
             door.Bind(grip);
             desktopActions[knob]=ToggleDoor;
             desktopActions[insideHandle]=ToggleDoor;
-            entry = Station("ENTRAR NA ALA DE ATIVIDADES",office.TransformPoint(new Vector3(1.85f,1.15f,-3.65f)),()=>Move(new Vector3(24,0,0)));
-            entry.SetActive(false);
-            manager.onCompleted.AddListener(()=>{ entry.SetActive(true); etapas.Concluir(EtapaExpediente.Sala); });
-            gameObject.AddComponent<LabPlaza>().Build();
-            AddLitRoof(new Vector3(18,2.78f,0),new Vector3(4,.12f,5.2f));
-            AddLitRoof(new Vector3(26,3.23f,0),new Vector3(12,.12f,10));
-            AddLitRoof(new Vector3(36.5f,3,0),new Vector3(9,.12f,3.2f));
-            AddLitRoof(new Vector3(14,3,2.5f),new Vector3(4,.12f,9)); // Galeria da praça
-            BuildWing();
-            BuildLounge();
-            loungeGate=Shape("Porta da descompressão",new Vector3(41,1.2f,0),new Vector3(.12f,2.4f,2.4f),teal);
-            var gateSign=Sign("DESCOMPRESSÃO   •   ABRE AO CONCLUIR O EXPEDIENTE",new Vector3(40.8f,2.6f,0),.067f);
-            ticks.Add(()=>{if(etapas.Em(EtapaExpediente.Descompressao))gateSign.text="DESCOMPRESSÃO   •   ENTRADA LIBERADA";});
-            Station("VOLTAR À RECEPÇÃO",new Vector3(23,1,-4),()=>Move(new Vector3(5.7f,0,7.1f)));
-            Station("RECOMEÇAR O DIA",new Vector3(50,1,-6),()=>UnityEngine.SceneManagement.SceneManager.LoadScene(gameObject.scene.name));
-        }
-        void BuildOffice(Transform office)
-        {
-            foreach (int side in new[]{-1,1})
-            {
-                Shape("Parede lateral",new Vector3(side*1.65f,1.32f,0),new Vector3(1.9f,2.64f,.12f),teal,parent:office);
-                Shape("Parede lateral",new Vector3(side*2.60f,1.32f,-2),new Vector3(.12f,2.64f,4),teal,parent:office);
-            }
-            Shape("Parede lateral",new Vector3(0,2.45f,0),new Vector3(1.4f,.38f,.12f),teal,parent:office);
-            Shape("Mesa do escritório",new Vector3(-1.85f,.44f,-2.45f),new Vector3(1.25f,.88f,.7f),gold,parent:office);
-            var chair=Shape("Cadeira do escritório",new Vector3(-1.8f,.25f,-1.62f),new Vector3(.48f,.5f,.48f),teal,parent:office);
+            // Área que conta como "entrou na sala": o interior da Sala A.
+            mission.room.transform.position=PlantaDaTrilha.AreaDeConclusao;
+            var zona=mission.room.GetComponent<BoxCollider>();
+            zona.center=new Vector3(0f,PlantaDaTrilha.TamanhoDaAreaDeConclusao.y/2f,0f);
+            zona.size=PlantaDaTrilha.TamanhoDaAreaDeConclusao;
+            Sign("SALA 2",PlantaDaTrilha.PlacaSala2,.09f,PlantaDaTrilha.GuinadaDasPortasDoCorredor);
+            Shape("Mesa do escritório",PlantaDaTrilha.MesaDoEscritorio,new Vector3(1.25f,.88f,.7f),gold);
+            var chair=Shape("Cadeira do escritório",PlantaDaTrilha.CadeiraDoEscritorio,new Vector3(.48f,.5f,.48f),teal);
             Shape("Encosto",new Vector3(0,.72f,.43f),new Vector3(1,.85f,.13f),navy,parent:chair.transform);
-            Shape("Quadro Redes",new Vector3(-2.49f,1.65f,-2.45f),new Vector3(.04f,.8f,.95f),navy,parent:office);
-            Sign("SALA DE AULA   •   SIGA EM FRENTE",office.TransformPoint(new Vector3(0,2.25f,-3.9f)),.077f);
-            foreach(float z in new[]{-2.02f,-.82f})
-                Shape("Prancha de carvalho",new Vector3(1.31f,.61f,z),new Vector3(.44f,1.22f,.07f),gold,parent:office);
-            foreach(float height in new[]{.70f,1.16f})
+            Shape("Quadro Redes",PlantaDaTrilha.QuadroDoEscritorio,new Vector3(.04f,.8f,.95f),navy);
+            var prateleira=PlantaDaTrilha.PrateleiraDoEscritorio;
+            foreach(float dx in new[]{-.6f,.6f})
+                Shape("Prancha de carvalho",prateleira+new Vector3(dx,.61f,0),new Vector3(.07f,1.22f,.44f),gold);
+            foreach(float altura in new[]{.70f,1.16f})
             {
-                Shape("Prancha de carvalho",new Vector3(1.31f,height,-1.42f),new Vector3(.42f,.05f,1.18f),gold,parent:office);
+                Shape("Prancha de carvalho",prateleira+new Vector3(0,altura,0),new Vector3(1.18f,.05f,.42f),gold);
                 for(int i=0;i<6;i++)
                 {
-                    int id=(height<1?24:30)+i;
-                    var volume=Shape("Volume "+id,new Vector3(1.31f,height+.16f,-1.84f+i*.078f),new Vector3(.26f,.062f,.21f),gold,parent:office);
-                    volume.transform.localRotation=Quaternion.Euler(0,90,90);
+                    int id=(altura<1?24:30)+i;
+                    var volume=Shape("Volume "+id,prateleira+new Vector3(-.42f+i*.078f,altura+.16f,0),new Vector3(.26f,.062f,.21f),gold);
+                    volume.transform.rotation=Quaternion.Euler(0,0,90);
                     Grab(volume).GetComponent<Rigidbody>().mass=.31f;
                 }
             }
@@ -118,22 +106,22 @@ namespace SebraeLab.Missions
             var delta=mission.playerHead.position-target;
             return Mathf.Abs(delta.y)<1.6f && new Vector2(delta.x,delta.z).sqrMagnitude<2.25f;
         }
+        Vector3 Macaneta => hinge.TransformPoint(new Vector3(PlantaDaTrilha.LarguraDaPorta-.13f,1,0));
         public string RoomHint()
         {
-            if (Near(hinge.TransformPoint(new Vector3(.99f,1,0)))) return door.IsOpen?"[F] Fechar a porta":"[F] Abrir a porta";
+            if (Near(Macaneta)) return door.IsOpen?"[F] Fechar a porta":"[F] Abrir a porta";
             if (mission.State==ManagerMissionState.FindRoom)
-                return DoorOpen?"Atravesse a porta e entre na sala.":Near(hinge.TransformPoint(new Vector3(.99f,1,.12f)))?"[F] Abrir a porta":"Siga as marcas azuis até a porta da sala.";
-            return entry.activeSelf && Near(entry.transform.position)?"[F] Entrar na ala de atividades":null;
+                return DoorOpen?"Atravesse a porta e entre na sala.":"Siga a luz dourada até a porta da Sala 2.";
+            return null;
         }
         public void UseRoom()
         {
-            if(Near(hinge.TransformPoint(new Vector3(.99f,1,0)))) ToggleDoor();
-            else if(entry.activeSelf && Near(entry.transform.position)) Move(new Vector3(24,0,0));
+            if(Near(Macaneta)) ToggleDoor();
         }
         void ToggleDoor() => door.Toggle();
         void Update()
         {
-            if(mission.playerRoot.position.y < -2f) Move(new Vector3(5.7f,.05f,7.1f));
+            if(mission.playerRoot.position.y < -2f) Move(PlantaDaTrilha.Nascimento+Vector3.up*.05f);
             foreach(var action in ticks) action();
             foreach(var action in pending) action();
             pending.Clear();
@@ -173,20 +161,15 @@ namespace SebraeLab.Missions
         /// Botão de missão em Canvas World Space. No Quest responde ao raio com o gatilho; no PC, à mira
         /// com clique ou F. Com etapa, fica cinza antes dela e explica o motivo se apertado.
         /// </summary>
-        GameObject Station(string caption,Vector3 p,Action action,EtapaExpediente? etapa=null)
+        GameObject Station(string caption,Vector3 p,Action action,EtapaExpediente? etapa=null,float? guinada=null)
         {
             // A ação entra na fila e roda no Update: evita mexer na cena dentro do evento de UI.
             var button=MissionButton.Criar(caption,area,p+Vector3.up*.25f,new Vector2(1.1f,.3f),()=>pending.Add(action),etapas,etapa);
             var root=button.Peca; // corpo e as duas faces: SetActive(false) esconde tudo
             // Parado: a direção é a do trecho, definida uma vez, sem girar para o jogador.
-            root.transform.rotation=Quaternion.Euler(0f,Placa.GuinadaPadrao(root.transform.position),0f);
+            root.transform.rotation=Quaternion.Euler(0f,guinada??Placa.GuinadaPadrao(root.transform.position),0f);
             stations[root]=button;
             return root;
-        }
-        void PassageFloor(string name, Vector3 position, Vector3 size)
-        {
-            var floor=Shape(name,position,size,navy);
-            floor.AddComponent<TeleportationArea>().interactionLayers=(UnityEngine.XR.Interaction.Toolkit.InteractionLayerMask)(1<<31);
         }
         void Room(string name,float x,float width,float depth)
         {
@@ -220,36 +203,36 @@ namespace SebraeLab.Missions
         }
         void ResetBody(Rigidbody rb,Vector3 p,Quaternion r)
         {if(!rb.isKinematic){rb.linearVelocity=Vector3.zero;rb.angularVelocity=Vector3.zero;}rb.position=p;rb.rotation=r;rb.Sleep();}
-        void AddLitRoof(Vector3 center,Vector3 size)
+        /// <summary>Mural na parede leste do corredor, placa do expediente e mesa de inovação sobre a Mesa Grande original.</summary>
+        void MontarMural()
         {
-            Shape("Teto preto",center,size,navy);
-            foreach(float offset in new[]{-.25f,.25f}){
-                var panel=Shape("Luminária",center+new Vector3(offset*size.x,-.14f,0),new Vector3(.84f,.06f,.28f),Color.white);
-                var lamp=panel.AddComponent<Light>();lamp.color=new Color(1,.94f,.84f);lamp.intensity=1.5f;lamp.range=7;lamp.renderMode=LightRenderMode.ForceVertex;
-            }
-        }
-        void BuildWing()
-        {
-            Room("Ala de atividades",26,12,10);
-            Sign("SALA DE AULA   •   BIBLIOTECA E INFORMÁTICA",new Vector3(28,2.35f,1),.07f);
-            Sign("DESCOMPRESSÃO  →",new Vector3(31.9f,2.2f,0),.09f);
-            status=Sign(etapas.Texto,new Vector3(26,2.6f,0),.105f);
-            etapas.TextoMudou+=texto=>status.text=texto;
-            mural=Sign("MURAL DO CONHECIMENTO",new Vector3(22,1.95f,2),.085f);
+            var quadro=GameObject.Find(PlantaDaTrilha.QuadroQueSai);
+            if(quadro) quadro.SetActive(false);
+            mural=Sign("MURAL DO CONHECIMENTO",PlantaDaTrilha.Mural,.085f,PlantaDaTrilha.GuinadaDoMural);
             // Liberado a partir do Mural: pode ser relido depois, como antes.
-            var muralButton=Station("LER O MURAL",new Vector3(22,1,2),()=>{if(!etapas.Alcancou(EtapaExpediente.Mural))return;mural.text="SEBRAE LAB\nUm espaço para experimentar ideias,\ntrocar experiências e aprender em grupo.";confirm.SetActive(true);Cursor.lockState=CursorLockMode.None;},EtapaExpediente.Mural);
+            var muralButton=Station("LER O MURAL",PlantaDaTrilha.BotaoLerMural,()=>{if(!etapas.Alcancou(EtapaExpediente.Mural))return;mural.text="SEBRAE LAB\nUm espaço para experimentar ideias,\ntrocar experiências e aprender em grupo.";confirm.SetActive(true);Cursor.lockState=CursorLockMode.None;},EtapaExpediente.Mural,PlantaDaTrilha.GuinadaDoMural);
             mural.gameObject.AddComponent<BoxCollider>();
             mural.GetComponent<Placa>().colisorMinimo=new Vector3(2.1f,.8f,.1f); // área de clique do PC: nunca menor que a de antes
             stations[mural.gameObject]=stations[muralButton];
-            confirm=Station("ENTENDIDO",new Vector3(23.8f,1,2),()=>{confirm.SetActive(false);Cursor.lockState=CursorLockMode.Locked;if(!etapas.Em(EtapaExpediente.Mural))return;etapas.Concluir(EtapaExpediente.Mural);coffee.enabled=true;coffeeSpot.SetActive(true);mural.text="MURAL DO CONHECIMENTO";});confirm.SetActive(false);
-            Shape("Balcão da copa",new Vector3(26,.45f,3),new Vector3(2,.9f,.8f),teal);
-            coffee=Grab(Shape("Copo de café",new Vector3(26,1.02f,3),new Vector3(.13f,.1f,.13f),gold,PrimitiveType.Cylinder));
+            confirm=Station("ENTENDIDO",PlantaDaTrilha.BotaoEntendido,()=>{confirm.SetActive(false);Cursor.lockState=CursorLockMode.Locked;if(!etapas.Em(EtapaExpediente.Mural))return;etapas.Concluir(EtapaExpediente.Mural);coffee.enabled=true;coffeeSpot.SetActive(true);mural.text="MURAL DO CONHECIMENTO";},guinada:PlantaDaTrilha.GuinadaDoMural);
+            confirm.SetActive(false);
+            status=Sign(etapas.Texto,PlantaDaTrilha.PlacaDoExpediente,.105f,PlantaDaTrilha.GuinadaDaPlacaDoExpediente);
+            etapas.TextoMudou+=texto=>status.text=texto;
+            Sign("MESA DE INOVAÇÃO",PlantaDaTrilha.PlacaDaMesaDeInovacao,.07f,PlantaDaTrilha.GuinadaDaMesaDeInovacao);
+            Grab(Shape("Cartilha de inovação",PlantaDaTrilha.Cartilha,new Vector3(.25f,.04f,.32f),gold));
+            Grab(Shape("Protótipo",PlantaDaTrilha.Prototipo,Vector3.one*.25f,teal,PrimitiveType.Sphere));
+        }
+
+        /// <summary>Copo na bancada real da copa; entrega no pires da mesa da Sala 2.</summary>
+        void MontarCafe()
+        {
+            coffee=Grab(Shape("Copo de café",PlantaDaTrilha.CopoDeCafe,new Vector3(.13f,.1f,.13f),gold,PrimitiveType.Cylinder));
             coffee.enabled=false;
-            var saucer=new Vector3(18.45f,.9f,-1.85f);
+            var saucer=PlantaDaTrilha.Pires;
             coffeeSpot=Shape("Pires • café",saucer,new Vector3(.32f,.012f,.32f),gold,PrimitiveType.Cylinder);
             coffeeSpot.GetComponent<Collider>().enabled=false;
             assigned[coffee.gameObject]=coffeeSpot;
-            var coffeeLabel=Sign("CAFÉ   •   ENTREGUE NO PIRES",saucer+Vector3.up*.27f,.065f);
+            var coffeeLabel=Sign("CAFÉ   •   ENTREGUE NO PIRES",saucer+Vector3.up*.27f,.065f,180f); // lida por quem está diante da mesa, olhando para o sul
             coffeeLabel.transform.SetParent(coffeeSpot.transform,true);
             coffeeSpot.SetActive(false);
             coffee.selectEntered.AddListener(e=>{if(etapas.Em(EtapaExpediente.Cafe))coffeeCollected=true;});
@@ -263,31 +246,55 @@ namespace SebraeLab.Missions
                     etapas.Concluir(EtapaExpediente.Cafe);ShowDeliveryTargets();
                 });
             });
-            Sign("COPA   •   RETIRE O CAFÉ",new Vector3(26,1.9f,3),.09f);
-            Shape("Mesa de inovação",new Vector3(22,.45f,-2),new Vector3(2,.9f,1),teal);
-            Grab(Shape("Cartilha de inovação",new Vector3(21.7f,.94f,-2),new Vector3(.25f,.04f,.32f),gold));
-            Grab(Shape("Protótipo",new Vector3(22.4f,1.06f,-2),Vector3.one*.25f,teal,PrimitiveType.Sphere));
-            Sign("MESA DE INOVAÇÃO",new Vector3(22,1.65f,-2),.07f);
-            for(int i=0;i<2;i++){
-                float x=27+i*1.6f;
-                Shape("Mesa de coworking",new Vector3(x,.45f,-2),new Vector3(1.45f,.9f,1),navy);
-                Shape("Prateleira",new Vector3(x,.55f,-4),new Vector3(1.45f,1.1f,.65f),teal);
-                Shape("Mesa da sala de aula",new Vector3(x,.45f,1),new Vector3(1.45f,.9f,.8f),teal);
-                var monitor=Shape("Tela",new Vector3(x,.0f+1.31f,1.27f),new Vector3(.53f,.32f,.035f),navy);
-                Shape("Pé de aço",new Vector3(x,1.04f,1.27f),new Vector3(.07f,.24f,.09f),navy);
-                for(int row=0;row<2;row++)
-                    for(int j=0;j<6;j++){
-                        int id=i*12+row*6+j;
-                        var pos=new Vector3(x-.59f+j*.062f,.089f+row*.506f+.13f,-3.94f);
-                        var volume=Shape("Volume "+id,pos,new Vector3(.25f,.042f+.003f*(j%3),.21f+.012f*(j%4)),gold);
-                        volume.transform.rotation=Quaternion.Euler(0,180,90);
-                        Grab(volume).GetComponent<Rigidbody>().mass=.31f;
-                    }
-                Delivery("Livro",new Vector3(x-.3f,.94f,-2),new Vector3(x,1.14f,-4),new Vector3(.25f,.08f,.32f),gold,0);
-                Delivery("Cadeira",new Vector3(x+.55f,.26f,-.6f),new Vector3(x,.26f,.24f),new Vector3(.46f,.5f,.45f),teal,1);
-                Delivery("Notebook",new Vector3(x+.3f,.94f,-2),new Vector3(x,.94f,1),new Vector3(.4f,.025f,.28f),Color.gray,2);}
-            Sign("ESTANTE",new Vector3(28,1.7f,-4),.075f);Sign("SALA DE AULA",new Vector3(28,1.8f,1),.075f);
-            lounge=Station("SALA DE DESCOMPRESSÃO",new Vector3(30,1,2),()=>Move(new Vector3(46,0,0)));lounge.SetActive(false);
+            Sign("COPA   •   RETIRE O CAFÉ",PlantaDaTrilha.PlacaDaCopa,.09f,PlantaDaTrilha.GuinadaDaPlacaDaCopa);
+        }
+
+        /// <summary>Sala de aula na Sala B: estante e duas mesas; os 6 itens começam dentro da própria sala.</summary>
+        void MontarOrganizacao()
+        {
+            var estante=Shape("Prateleira",PlantaDaTrilha.Estante,PlantaDaTrilha.TamanhoDaEstante,teal);
+            estante.transform.rotation=Quaternion.Euler(0f,90f,0f); // comprimento ao longo da parede oeste
+            Sign("ESTANTE",PlantaDaTrilha.Estante+new Vector3(.4f,1.2f,0f),.075f,270f);
+            foreach(var mesa in PlantaDaTrilha.Mesas)
+            {
+                Shape("Mesa da sala de aula",mesa,PlantaDaTrilha.TamanhoDaMesa,teal);
+                Shape("Tela",new Vector3(mesa.x,1.31f,mesa.z-.27f),new Vector3(.53f,.32f,.035f),navy);
+                Shape("Pé de aço",new Vector3(mesa.x,1.04f,mesa.z-.27f),new Vector3(.07f,.24f,.09f),navy);
+            }
+            Sign("SALA DE AULA",PlantaDaTrilha.PlacaSalaDeAula,.075f,PlantaDaTrilha.GuinadaDasPortasDoCorredor);
+            for(int i=0;i<2;i++) Delivery("Livro",PlantaDaTrilha.InicioDosLivros[i],PlantaDaTrilha.DestinoDosLivros[i],new Vector3(.25f,.08f,.32f),gold,0);
+            for(int i=0;i<2;i++) Delivery("Cadeira",PlantaDaTrilha.InicioDasCadeiras[i],PlantaDaTrilha.DestinoDasCadeiras[i],new Vector3(.46f,.5f,.45f),teal,1);
+            for(int i=0;i<2;i++) Delivery("Notebook",PlantaDaTrilha.InicioDosNotebooks[i],PlantaDaTrilha.DestinoDosNotebooks[i],new Vector3(.4f,.025f,.28f),Color.gray,2);
+        }
+
+        /// <summary>Porta de vidro dos fundos trancada até o fim, frestas fechadas e botão da descompressão escondido.</summary>
+        void MontarFundos()
+        {
+            var vidro=GameObject.Find(PlantaDaTrilha.NomeDaPortaDeVidro);
+            if(!vidro) throw new InvalidOperationException("Porta de vidro dos fundos ausente: "+PlantaDaTrilha.NomeDaPortaDeVidro);
+            portaDeVidro=vidro.AddComponent<PortaDeVidro>();
+            placaDaPorta=Sign("DESCOMPRESSÃO   •   ABRE AO CONCLUIR O EXPEDIENTE",PlantaDaTrilha.PlacaDaPortaDosFundos,.067f,PlantaDaTrilha.GuinadaDaPortaDosFundos);
+            var frestas=new GameObject("Frestas • porta dos fundos").transform;
+            frestas.SetParent(area,false);
+            for(int i=0;i<PlantaDaTrilha.Frestas.Length;i++)
+            {
+                var fresta=new GameObject("Fresta "+(i+1)).AddComponent<BoxCollider>();
+                fresta.transform.SetParent(frestas,false);
+                fresta.transform.position=PlantaDaTrilha.Frestas[i].center;
+                fresta.size=PlantaDaTrilha.Frestas[i].size;
+            }
+            botaoDescompressao=Station("SALA DE DESCOMPRESSÃO",PlantaDaTrilha.BotaoDaDescompressao,()=>Move(PlantaDaTrilha.EntradaDaDescompressao),guinada:180f);
+            botaoDescompressao.SetActive(false);
+        }
+
+        /// <summary>Fim da trilha: abre a porta de vidro dos fundos e mostra o botão da descompressão.</summary>
+        public void LiberarDescompressao()
+        {
+            if(portaDosFundosAberta)return;
+            portaDosFundosAberta=true;
+            portaDeVidro.Abrir();
+            placaDaPorta.text="DESCOMPRESSÃO   •   ENTRADA LIBERADA";
+            botaoDescompressao.SetActive(true);
         }
         readonly List<GameObject>[] destinations={new List<GameObject>(),new List<GameObject>(),new List<GameObject>()};
         string[] jobs={"Guarde os livros na estante","Alinhe as cadeiras nas marcas","Leve os notebooks às mesas"};
@@ -324,6 +331,9 @@ namespace SebraeLab.Missions
             assigned[g]=marker;
             destinations[kind].Add(marker);marker.SetActive(false);
             var grab=Grab(g);bool delivered=false;
+            itens[kind].Add(g);
+            grab.selectEntered.AddListener(e=>itemNaMao=g);
+            grab.selectExited.AddListener(e=>{if(itemNaMao==g)itemNaMao=null;});
             var deliveryBody = g.GetComponent<Rigidbody>();
             grab.selectExited.AddListener(e=>{
                 var releasePosition = deliveryBody.position;
@@ -336,13 +346,13 @@ namespace SebraeLab.Missions
                 if(kind!=placed/2){if(near)etapas.Avisar(jobs[placed/2]+" primeiro.");return;}
                 var slot=near ? marker : null;
                 if(!slot){etapas.Avisar("Destino de "+itemLabel+": "+destinationLabel.text+". Mire na marca e solte.");return;}
-                delivered=true;tag.gameObject.SetActive(false);
+                delivered=true;itens[kind].Remove(g);tag.gameObject.SetActive(false);
                 deliveryBody.isKinematic=true;
                 grab.enabled=false;
                 g.transform.SetPositionAndRotation(slot.transform.position+Vector3.up*(size.y/2),Quaternion.identity);
                 destinations[kind].Remove(slot);slot.SetActive(false);
                 placed++;
-                if(placed==ItemCount){etapas.Concluir(EtapaExpediente.Organizacao);loungeGate.SetActive(false);lounge.SetActive(true);}
+                if(placed==ItemCount){etapas.Concluir(EtapaExpediente.Organizacao);LiberarDescompressao();}
                 else etapas.Progresso("Organização • "+placed+" de "+ItemCount+" itens");
                 ShowDeliveryTargets();
             });});

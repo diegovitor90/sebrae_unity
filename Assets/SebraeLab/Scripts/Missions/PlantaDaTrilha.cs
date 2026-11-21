@@ -25,7 +25,7 @@ namespace SebraeLab.Missions
         public const string NomeDaEntrada = "Entrada ";
 
         // ---------------------------------------------------------------- Sala 2 (Sala A do prédio)
-        public static readonly Bounds Sala2 = new Bounds(new Vector3(-2.625f, 1.4f, -4.75f), new Vector3(5.75f, 2.8f, 2.1f));
+        public static readonly Bounds Sala2 = new Bounds(new Vector3(-2.625f, 1.4f, -4.625f), new Vector3(5.75f, 2.8f, 2.35f));
         /// <summary>Dobradiça: ponta norte do vão de cerca de 0,8 m na parede do corredor.</summary>
         public static readonly Vector3 Dobradica = new Vector3(.62f, 0f, -3.6f);
         /// <summary>Com 90°, a porta fechada vai da dobradiça para o sul; abrindo, gira para dentro da Sala A.</summary>
