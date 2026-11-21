@@ -312,7 +312,17 @@ namespace SebraeLab.Editor
             r.Check(Vector3.Angle(seta.Seta.forward, direcao) < 2f, "a seta aponta para o feixe no plano do chão");
             r.Check(seta.Seta.GetComponentsInChildren<Transform>(true).Where(t => t.name == "Haste").All(t => t.localScale.z <= SetaDoPulso.Tamanho),
                 "a seta é pequena (cerca de 8 cm)");
-            r.Check(mission.day.SetaDoHud() != null, "o HUD do PC tem a seta de texto");
+            // No mesmo quadro: o DesktopPlayer reescreve a rotação da cabeça no Update.
+            var cabeca = mission.playerHead;
+            var giro = cabeca.rotation;
+            var paraOFeixe = Vector3.ProjectOnPlane(Object.FindFirstObjectByType<Feixe>().transform.position - cabeca.position, Vector3.up);
+            cabeca.rotation = Quaternion.LookRotation(paraOFeixe);
+            r.Check(mission.day.SetaDoHud() == "", "olhando para o feixe, o HUD do PC não mostra seta");
+            cabeca.rotation = Quaternion.LookRotation(-paraOFeixe);
+            r.Check(mission.day.SetaDoHud().Contains("atrás"), "de costas para o feixe, o HUD do PC diz que a luz está atrás");
+            cabeca.rotation = Quaternion.LookRotation(Quaternion.Euler(0f, 90f, 0f) * paraOFeixe); // virado 90° à direita, o feixe fica à esquerda
+            r.Check(mission.day.SetaDoHud().Contains("esquerda"), "virado para a direita, o HUD do PC diz que a luz está à esquerda");
+            cabeca.rotation = giro;
         }
 
         static IEnumerator Descompressao(ManagerMission mission, Relatorio r)
