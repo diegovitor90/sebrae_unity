@@ -9,6 +9,8 @@ using UnityEditor.SceneManagement;
 using UnityEngine;
 using UnityEngine.SceneManagement;
 using SebraeLab.Missions;
+using UnityEngine.XR.Interaction.Toolkit;
+using UnityEngine.XR.Interaction.Toolkit.Interactables;
 using Object = UnityEngine.Object;
 
 namespace SebraeLab.Editor
@@ -34,7 +36,8 @@ namespace SebraeLab.Editor
         }
 
         /// <summary>Seções, na ordem em que rodam. Cada tarefa do plano acrescenta as suas.</summary>
-        static readonly Func<ManagerMission, Relatorio, IEnumerator>[] Passos = { Abertura, Sala2, MuralECafe, Organizacao, Vestigios, Guia, Seta, PortaDosFundos, Descompressao };
+        static readonly Func<ManagerMission, Relatorio, IEnumerator>[] Passos = { Abertura, Sala2, MuralECafe, Organizacao, Vestigios, Guia, Seta, ForaDeOrdem,
+            PortaDosFundos, Descompressao, PaineisEParedes, Simulador, Orcamento };
 
         static TrilhaCheck() { EditorApplication.update += Poll; }
 
@@ -351,14 +354,355 @@ namespace SebraeLab.Editor
             r.Check(Distancia2D(mission.playerHead.position, PlantaDaTrilha.ChegadaDosFundos) < .6f, "Voltar ao prédio leva aos fundos");
         }
 
+        /// <summary>
+        /// Fotografa cada painel e placa de pontos do prédio em que uma parede opaca fica entre a pessoa e ele, ligado e
+        /// desligado. Fotos diferentes: o painel aparece; cada pixel que mudou é conferido pela própria linha de visão, e só
+        /// conta como falha o que está atrás de superfície opaca (atrás de vidro, o painel é visível de verdade).
+        /// </summary>
+        static IEnumerator PaineisEParedes(ManagerMission mission, Relatorio r)
+        {
+            r.Secao("Painéis e paredes");
+            yield return null;
+
+            var paineis = new List<(string nome, Bounds caixa, Action<bool> ligar, Plane plano, string shader)>();
+            foreach (var c in Object.FindObjectsByType<Canvas>(FindObjectsSortMode.None)
+                         .Where(c => c.isRootCanvas && c.renderMode == RenderMode.WorldSpace && c.gameObject.activeInHierarchy))
+            {
+                var cantos = new Vector3[4];
+                c.GetComponent<RectTransform>().GetWorldCorners(cantos);
+                var caixa = new Bounds(cantos[0], Vector3.zero);
+                foreach (var v in cantos) caixa.Encapsulate(v);
+                var canvas = c;
+                var nome = c.transform.parent && (c.name == "Frente" || c.name == "Verso") ? $"{c.transform.parent.name} • {c.name}" : c.name;
+                var grafico = c.GetComponentInChildren<UnityEngine.UI.Text>();
+                paineis.Add((nome, caixa, ligado => canvas.enabled = ligado, new Plane(c.transform.forward, c.transform.position),
+                    grafico ? grafico.materialForRendering.shader.name : "?"));
+            }
+            foreach (var t in Object.FindObjectsByType<TextMesh>(FindObjectsSortMode.None).Where(t => t.gameObject.activeInHierarchy))
+            {
+                var render = t.GetComponent<MeshRenderer>();
+                if (!render) continue;
+                paineis.Add(($"{t.name} \"{t.text.Replace('\n', ' ')}\"", render.bounds, ligado => render.enabled = ligado,
+                    new Plane(t.transform.forward, t.transform.position), render.sharedMaterial ? render.sharedMaterial.shader.name : "?"));
+            }
+            r.Info($"{paineis.Count} painéis e placas ativos medidos");
+
+            var objetoCamera = new GameObject("Câmera dos painéis");
+            var camera = objetoCamera.AddComponent<Camera>();
+            camera.fieldOfView = 40f; camera.nearClipPlane = .05f; camera.farClipPlane = 60f;
+            camera.clearFlags = CameraClearFlags.SolidColor; camera.backgroundColor = Color.black;
+            var alvo = new RenderTexture(160, 160, 24);
+            camera.targetTexture = alvo;
+            var textura = new Texture2D(160, 160, TextureFormat.RGB24, false);
+            Color32[] Foto()
+            {
+                RenderTexture.active = alvo;
+                camera.Render();
+                textura.ReadPixels(new Rect(0, 0, 160, 160), 0, 0);
+                textura.Apply(false);
+                RenderTexture.active = null;
+                return textura.GetPixels32();
+            }
+            // Material do ponto atingido. Num modelo com parede e vidro na mesma malha, vale o da submalha do triângulo atingido.
+            Material MaterialAtingido(RaycastHit h)
+            {
+                var render = h.collider.GetComponent<Renderer>();
+                if (!render) return null;
+                var materiais = render.sharedMaterials;
+                if (materiais.Length == 1) return materiais[0];
+                if (h.collider is MeshCollider malha && malha.sharedMesh && h.triangleIndex >= 0)
+                {
+                    int indice = h.triangleIndex * 3;
+                    for (int s = 0; s < malha.sharedMesh.subMeshCount && s < materiais.Length; s++)
+                    {
+                        var sub = malha.sharedMesh.GetSubMesh(s);
+                        if (indice >= sub.indexStart && indice < sub.indexStart + sub.indexCount) return materiais[s];
+                    }
+                }
+                return materiais.FirstOrDefault(m => m && m.renderQueue >= 2500) ?? materiais.FirstOrDefault();
+            }
+            bool Opaco(RaycastHit h)
+            {
+                var material = MaterialAtingido(h);
+                return material && material.renderQueue < 2500;
+            }
+
+            byte[] Png(Color32[] pixels)
+            {
+                var copia = new Texture2D(160, 160, TextureFormat.RGB24, false);
+                copia.SetPixels32(pixels); copia.Apply(false);
+                var png = copia.EncodeToPNG(); Object.Destroy(copia); return png;
+            }
+            int Diferentes(Color32[] com, Color32[] sem)
+            {
+                int n = 0;
+                for (int i = 0; i < com.Length; i++)
+                    if (Mathf.Abs(com[i].r - sem[i].r) + Mathf.Abs(com[i].g - sem[i].g) + Mathf.Abs(com[i].b - sem[i].b) > 24) n++;
+                return n;
+            }
+
+            // Controle: de frente, a 2 m e sem nada no meio, a medição precisa enxergar o painel da conversa.
+            var conversa = paineis.FirstOrDefault(p => p.nome == "Conversa com o gerente");
+            if (conversa.ligar != null)
+            {
+                var canvasDaConversa = Object.FindObjectsByType<Canvas>(FindObjectsSortMode.None).First(c => c.name == "Conversa com o gerente");
+                var olhoDeControle = conversa.caixa.center - canvasDaConversa.transform.forward * 2f;
+                objetoCamera.transform.SetPositionAndRotation(olhoDeControle, Quaternion.LookRotation(conversa.caixa.center - olhoDeControle));
+                conversa.ligar(true); var com = Foto();
+                conversa.ligar(false); var sem = Foto();
+                conversa.ligar(true);
+                int vistos = Diferentes(com, sem);
+                r.Check(vistos > 12, $"controle: sem parede no meio, a medição enxerga o painel da conversa ({vistos} pixels mudam)");
+            }
+            else r.Check(false, "controle: painel \"Conversa com o gerente\" não encontrado");
+
+            var falhas = new List<string>();
+            var atrasDeVidro = new HashSet<string>();
+            var casosPorPainel = new Dictionary<int, int>();
+            int fotos = 0;
+            const int limiteDeFotos = 2400, casosPorPainelNoMaximo = 12;
+            var predio = PlantaDaTrilha.Predio;
+            for (float x = predio.min.x; x <= predio.max.x && fotos < limiteDeFotos; x += 1.5f)
+            for (float z = predio.min.z; z <= predio.max.z && fotos < limiteDeFotos; z += 1.5f)
+            {
+                var pe = new Vector3(x, 0f, z);
+                if (!Physics.Raycast(pe + Vector3.up * .6f, Vector3.down, out var chao, 1.2f, ~0, QueryTriggerInteraction.Ignore) || chao.point.y > .5f) continue;
+                var cabeca = new Vector3(x, chao.point.y + 1.6f, z);
+                if (Physics.CheckSphere(cabeca, .2f, ~0, QueryTriggerInteraction.Ignore)) continue;
+                for (int k = 0; k < paineis.Count; k++)
+                {
+                    var p = paineis[k];
+                    var centro = p.caixa.center;
+                    var vetor = centro - cabeca;
+                    if (vetor.magnitude > 9f || fotos >= limiteDeFotos) continue;
+                    casosPorPainel.TryGetValue(k, out var casos);
+                    if (casos >= casosPorPainelNoMaximo) continue; // espalha a amostra pelo prédio todo
+                    var bateu = Physics.Raycast(cabeca, vetor, out var parede, vetor.magnitude - .05f, ~0, QueryTriggerInteraction.Ignore);
+                    if (!bateu) continue;
+                    if (!Opaco(parede))
+                    {
+                        // Livre de parede opaca: o que a pessoa vê através de vidro é visível de verdade. Anota para o relatório.
+                        var material = MaterialAtingido(parede);
+                        if (material && material.renderQueue >= 2500 && !parede.collider.GetComponent<TextMesh>())
+                            atrasDeVidro.Add($"{p.nome} atrás de {parede.collider.name} ({material.name})");
+                        continue;
+                    }
+                    objetoCamera.transform.SetPositionAndRotation(cabeca, Quaternion.LookRotation(vetor));
+                    p.ligar(true);
+                    var com = Foto();
+                    p.ligar(false);
+                    var sem = Foto();
+                    p.ligar(true);
+                    fotos += 2;
+                    casosPorPainel[k] = casos + 1;
+                    int diferentes = Diferentes(com, sem);
+                    if (diferentes <= 12) continue;
+                    // O raio do centro bateu em algo opaco, mas o painel é largo: cada pixel que mudou tem a própria linha de
+                    // visão. Só conta como "através da parede" o pixel cuja primeira superfície no caminho é opaca; atrás de
+                    // vidro (caixilho ao lado) o painel é visível de verdade.
+                    int livres = 0, porVidro = 0, porOpaco = 0;
+                    for (int i = 0; i < com.Length; i++)
+                    {
+                        if (Mathf.Abs(com[i].r - sem[i].r) + Mathf.Abs(com[i].g - sem[i].g) + Mathf.Abs(com[i].b - sem[i].b) <= 24) continue;
+                        var raio = camera.ViewportPointToRay(new Vector3((i % 160 + .5f) / 160f, (i / 160 + .5f) / 160f, 0f));
+                        if (!p.plano.Raycast(raio, out var ate)) continue;
+                        if (!Physics.Raycast(raio, out var antes, ate - .02f, ~0, QueryTriggerInteraction.Ignore)) livres++;
+                        else if (Opaco(antes)) porOpaco++;
+                        else porVidro++;
+                    }
+                    r.Info($"{p.nome} visto de {Fmt(cabeca)} com o centro atrás de {parede.collider.name}: {diferentes} pixels mudam " +
+                           $"({livres} com visão livre, {porVidro} através de vidro, {porOpaco} através de parede opaca); shader {p.shader}");
+                    if (porOpaco <= 12) continue;
+                    File.WriteAllBytes($"Logs/paineis-{falhas.Count}-com.png", Png(com));
+                    File.WriteAllBytes($"Logs/paineis-{falhas.Count}-sem.png", Png(sem));
+                    falhas.Add($"{p.nome} aparece através de {parede.collider.name}, visto de {Fmt(cabeca)} ({porOpaco} pixels atrás de parede opaca)");
+                }
+                yield return null;
+            }
+            Object.Destroy(objetoCamera);
+            Object.Destroy(textura);
+            alvo.Release();
+            r.Check(fotos > 0, $"a medição fotografou {fotos / 2} casos de parede opaca entre a pessoa e o painel, cobrindo {casosPorPainel.Count} dos {paineis.Count} painéis e placas");
+            r.Check(fotos < limiteDeFotos, $"a amostra percorreu o prédio inteiro antes do limite de {limiteDeFotos} fotos");
+            r.Check(falhas.Count == 0, falhas.Count == 0 ? "nenhum painel ou placa aparece através de parede opaca"
+                : $"{falhas.Count} casos, por exemplo: {string.Join(" | ", falhas.Take(3))}");
+            foreach (var f in falhas.Skip(3).Take(20)) r.Info(f);
+            r.Info(atrasDeVidro.Count == 0 ? "nenhum painel visto através de vidro" : $"vistos através de vidro ({atrasDeVidro.Count}): {string.Join(" | ", atrasDeVidro.Take(40))}");
+        }
+
+        /// <summary>
+        /// Ata da reunião: nada avança sem a etapa anterior, peças e jogador caídos voltam, e tudo que se pega é alcançável.
+        /// Roda antes da porta dos fundos, com o gerente ainda à espera e a porta trancada (LiberarDescompressao não volta atrás).
+        /// </summary>
+        static IEnumerator ForaDeOrdem(ManagerMission mission, Relatorio r)
+        {
+            r.Secao("Fora de ordem");
+            yield return null;
+            var day = mission.day;
+            var cabeca = mission.playerHead;
+            var cabecaAntes = cabeca.position;
+            var gerente = Chao(mission.manager.position);
+            var perto = PlantaDaTrilha.FeixeDoGerente + Vector3.up * 1.62f;
+            var longe = gerente + (Chao(PlantaDaTrilha.FeixeDoGerente) - gerente).normalized * 6f + Vector3.up * 1.62f;
+            r.Check(mission.State == ManagerMissionState.FindManager, $"a seção começa com o gerente à espera ({mission.State})");
+
+            // 1. Sem aproximar, a conversa não começa.
+            cabeca.position = longe;
+            mission.Interact();
+            cabeca.position = cabecaAntes;
+            r.Check(mission.State == ManagerMissionState.FindManager, "a 6 m do gerente, interagir não começa a conversa");
+
+            // 3. Sem o gerente, o feixe não pula etapas.
+            r.Check(Vector3.Distance(GuiaDaTrilha.Destino(day.Estado()), PlantaDaTrilha.FeixeDoGerente) < .01f, "sem falar com o gerente, o feixe fica diante dele");
+
+            // 4. Atividades fora de ordem, com o gerente à espera.
+            var etapaAntes = day.Estado().Etapa;
+            bool portaAntes = day.PortaDosFundosAberta;
+            var copo = GameObject.Find("Copo de café");
+            var pegaCopo = copo ? copo.GetComponent<XRGrabInteractable>() : null;
+            r.Check(pegaCopo, "o copo de café pode ser pego");
+            if (pegaCopo)
+            {
+                var corpo = copo.GetComponent<Rigidbody>();
+                var (pos, rot) = (corpo.position, corpo.rotation);
+                pegaCopo.selectEntered.Invoke(new SelectEnterEventArgs());
+                bool naMao = day.Estado().CafeNaMao;
+                Colocar(corpo, PlantaDaTrilha.Pires + Vector3.up * .11f, rot);
+                pegaCopo.selectExited.Invoke(new SelectExitEventArgs());
+                yield return null;
+                yield return null;
+                var etapa = day.Estado().Etapa;
+                Colocar(corpo, pos, rot);
+                r.Check(!naMao && etapa == etapaAntes, $"pegar o café e soltar no pires antes da hora não conta (café na mão: {naMao}; etapa {etapa})");
+            }
+            var corpos = Object.FindObjectsByType<Rigidbody>(FindObjectsSortMode.None);
+            foreach (var (nome, inicio, destino) in new[] {
+                ("Livro", PlantaDaTrilha.InicioDosLivros[0], PlantaDaTrilha.DestinoDosLivros[0]),
+                ("Cadeira", PlantaDaTrilha.InicioDasCadeiras[0], PlantaDaTrilha.DestinoDasCadeiras[0]),
+                ("Notebook", PlantaDaTrilha.InicioDosNotebooks[0], PlantaDaTrilha.DestinoDosNotebooks[0]) })
+            {
+                var item = corpos.Where(b => b.name == nome).OrderBy(b => Vector3.Distance(b.position, inicio)).FirstOrDefault();
+                var pega = item ? item.GetComponent<XRGrabInteractable>() : null;
+                if (!pega) { r.Check(false, $"{nome} 1 não encontrado"); continue; }
+                var (pos, rot) = (item.position, item.rotation);
+                pega.selectEntered.Invoke(new SelectEnterEventArgs());
+                Colocar(item, destino, Quaternion.identity);
+                pega.selectExited.Invoke(new SelectExitEventArgs());
+                yield return null;
+                yield return null;
+                var etapa = day.Estado().Etapa;
+                bool entregue = item.isKinematic || !pega.enabled;
+                Colocar(item, pos, rot);
+                r.Check(!entregue && etapa == etapaAntes, $"soltar {nome} 1 na marca antes da organização não conta (entregue: {entregue}; etapa {etapa})");
+            }
+            var porta = Object.FindFirstObjectByType<HandDoor>();
+            if (porta)
+            {
+                porta.Toggle();
+                yield return new WaitForSeconds(1f);
+                bool aberta = day.DoorOpen;
+                cabeca.position = mission.room.transform.position + Vector3.up * 1.6f;
+                bool dentro = mission.room.Contains(cabeca.position);
+                mission.EvaluatePlayer();
+                cabeca.position = cabecaAntes;
+                yield return null;
+                var etapa = day.Estado().Etapa;
+                r.Check(aberta && dentro && mission.State == ManagerMissionState.FindManager && mission.CompletionCount == 0 && etapa == etapaAntes,
+                    $"entrar na Sala 2 sem falar com o gerente não conclui a sala (porta aberta: {aberta}; dentro: {dentro}; {mission.State}; etapa {etapa})");
+                porta.Toggle();
+                yield return new WaitForSeconds(1f);
+            }
+            else r.Check(false, "porta da Sala 2 não encontrada");
+            var lerMural = Peca("LER O MURAL");
+            r.Check(lerMural && day.UseStation(lerMural), "o botão Ler o mural responde");
+            yield return null;
+            yield return null;
+            r.Check(!day.Reading && day.Estado().Etapa == etapaAntes, $"Ler o mural antes da hora não abre o painel nem avança (etapa {day.Estado().Etapa})");
+            r.Check(day.PortaDosFundosAberta == portaAntes && !day.PortaDosFundosAberta, "nenhuma ação fora de ordem abre a porta dos fundos");
+            r.Check(Vector3.Distance(GuiaDaTrilha.Destino(day.Estado()), PlantaDaTrilha.FeixeDoGerente) < .01f, "depois das tentativas, o feixe continua diante do gerente");
+
+            // 2. Sem estar perto, o diálogo não avança.
+            cabeca.position = perto;
+            mission.Interact();
+            bool emDialogo = mission.State == ManagerMissionState.Dialogue;
+            int indice = mission.DialogueIndex;
+            cabeca.position = longe;
+            mission.Interact();
+            bool parado = mission.State == ManagerMissionState.Dialogue && mission.DialogueIndex == indice;
+            cabeca.position = cabecaAntes;
+            r.Check(emDialogo && parado, $"perto, a conversa começa; longe, o diálogo não avança (fala {mission.DialogueIndex}, {mission.State})");
+            mission.RestartMission(); // volta à espera para as seções seguintes
+            r.Check(mission.State == ManagerMissionState.FindManager, "a missão volta à espera do gerente");
+
+            // 5. Peça perdida volta.
+            var nomes = new[] { "Livro", "Cadeira", "Notebook", "Cartilha de inovação", "Protótipo" };
+            var pecas = Object.FindObjectsByType<Rigidbody>(FindObjectsSortMode.None).Where(b => nomes.Contains(b.name)).ToList();
+            var inicioDasPecas = pecas.ToDictionary(b => b, b => b.position);
+            foreach (var b in pecas) Colocar(b, new Vector3(b.position.x, -3f, b.position.z), b.rotation);
+            yield return new WaitForSeconds(1f);
+            var perdidas = pecas.Where(b => Vector3.Distance(b.position, inicioDasPecas[b]) >= .3f).Select(b => $"{b.name} em {Fmt(b.position)}").ToList();
+            r.Check(pecas.Count == 8 && perdidas.Count == 0,
+                $"{pecas.Count} peças jogadas para y = −3 voltaram ao lugar{(perdidas.Count == 0 ? "" : "; não voltaram: " + string.Join(", ", perdidas))}");
+
+            // 6. Jogador caído volta.
+            var raiz = mission.playerRoot;
+            var controle = raiz.GetComponent<CharacterController>();
+            bool ligado = controle && controle.enabled;
+            if (ligado) controle.enabled = false;
+            raiz.position = new Vector3(raiz.position.x, -5f, raiz.position.z);
+            if (ligado) controle.enabled = true;
+            yield return new WaitForSeconds(1f);
+            var ondeFicou = new Vector3(mission.playerHead.position.x, raiz.position.y, mission.playerHead.position.z);
+            r.Check(Vector3.Distance(ondeFicou, PlantaDaTrilha.Nascimento) < 1f, $"o jogador caído volta ao nascimento ({Fmt(ondeFicou)})");
+
+            // 7. Tudo que se pega é alcançável: há chão livre a até 1 m do lugar de cada peça.
+            foreach (var b in pecas)
+                r.Check(Caminho(mission, PlantaDaTrilha.Nascimento, Chao(inicioDasPecas[b]), out var d, 1f),
+                    $"{b.name} em {Fmt(inicioDasPecas[b])} é alcançável a pé ({d:0.#} m)");
+        }
+
+        static void Colocar(Rigidbody corpo, Vector3 posicao, Quaternion giro)
+        {
+            if (!corpo.isKinematic) { corpo.linearVelocity = Vector3.zero; corpo.angularVelocity = Vector3.zero; }
+            corpo.position = posicao;
+            corpo.rotation = giro;
+            corpo.transform.SetPositionAndRotation(posicao, giro);
+            Physics.SyncTransforms();
+        }
+
+        static IEnumerator Simulador(ManagerMission mission, Relatorio r)
+        {
+            r.Secao("Simulador XR");
+            yield return null;
+            var simulador = AcharObjeto("Simulador PC - excluido da build");
+            r.Check(simulador, "o XR Device Simulator está na cena");
+            r.Check(simulador && !simulador.gameObject.activeSelf && simulador.CompareTag("EditorOnly"), "desligado e fora da build");
+            r.Check(AcharObjeto("Left Controller") && AcharObjeto("Right Controller"), "os dois controles existem no jogador");
+            r.Check(AssetDatabase.LoadAssetAtPath<GameObject>("Assets/Samples/XR Interaction Toolkit/3.0.11/XR Device Simulator/XR Device Simulator.prefab"),
+                "o prefab do simulador existe nos Samples");
+        }
+
+        static IEnumerator Orcamento(ManagerMission mission, Relatorio r)
+        {
+            r.Secao("Orçamento de interface");
+            yield return null;
+            var canvases = Object.FindObjectsByType<Canvas>(FindObjectsSortMode.None).Where(c => c.isRootCanvas && c.renderMode == RenderMode.WorldSpace).ToList();
+            var graficos = canvases.Sum(c => c.GetComponentsInChildren<UnityEngine.UI.Graphic>().Count(g => g.isActiveAndEnabled));
+            var luzes = Object.FindObjectsByType<Light>(FindObjectsSortMode.None).Count(l => l.isActiveAndEnabled);
+            var placas = Object.FindObjectsByType<TextMesh>(FindObjectsSortMode.None).Count(t => t.gameObject.activeInHierarchy && t.GetComponent<MeshRenderer>().enabled);
+            r.Info($"Canvas de mundo ativos: {canvases.Count}; elementos de UI ativos: {graficos}; placas com texto: {placas}; luzes ativas: {luzes}");
+            r.Info("Só informa. O custo de verdade se mede no Quest (ver o roteiro).");
+        }
+
         // ------------------------------------------------------------------------------------------- Ajudantes
 
         /// <summary>
         /// Busca em largura numa grade de 20 cm, em quatro direções, com um corpo de 0,22 m de raio e 1,75 m de altura:
         /// chão firme embaixo e espaço livre do degrau (0,15 m) até a cabeça. Ignora gatilhos e o próprio jogador.
         /// O comprimento é o número de passos vezes 0,2 m.
+        /// <c>chegada</c>: distância no chão que conta como ter chegado (padrão 0,15 m, menos que uma casa da grade).
         /// </summary>
-        static bool Caminho(ManagerMission mission, Vector3 de, Vector3 ate, out float comprimento)
+        static bool Caminho(ManagerMission mission, Vector3 de, Vector3 ate, out float comprimento, float chegada = .15f)
         {
             const float grade = .2f, raio = .22f, altura = 1.75f, degrau = .15f;
             var jogador = mission.playerRoot;
@@ -379,7 +723,7 @@ namespace SebraeLab.Editor
             {
                 var c = fila.Dequeue();
                 var p = Mundo(c);
-                if (new Vector2(p.x - ate.x, p.z - ate.z).magnitude < grade * .75f)
+                if (new Vector2(p.x - ate.x, p.z - ate.z).magnitude < chegada)
                 {
                     int passos = 0;
                     for (var k = c; k != Vector2Int.zero; k = anterior[k]) passos++;
