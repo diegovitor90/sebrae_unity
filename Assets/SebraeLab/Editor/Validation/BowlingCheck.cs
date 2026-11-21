@@ -53,6 +53,8 @@ namespace SebraeLab.Editor
             if (!mission || !lane) return;
             SessionState.SetBool(ExitKey, File.ReadAllText(Request).Trim() == "sair");
             File.Delete(Request);
+            mission.day.LiberarDescompressao(); // a descompressão fica desligada até o fim da trilha
+            Physics.SyncTransforms();
             mission.StartCoroutine(Run(lane));
         }
 
@@ -122,7 +124,7 @@ namespace SebraeLab.Editor
             // Soltar baixo sobre o piso de lançamento (8 cm abaixo da pista): a bola precisa subir para a pista sem bater no degrau.
             lane.Rearmar();
             yield return new WaitForFixedUpdate();
-            Soltar(lane, new Vector3(45.6f, .155f + .3f, -4.0f), Vector3.forward * 5f, true);
+            Soltar(lane, PlantaDaTrilha.NaDescompressao(new Vector3(45.6f, .155f + .3f, -4.0f)), Vector3.forward * 5f, true);
             yield return new WaitForSeconds(.3f);
             var v2 = corpo.linearVelocity;
             float apoio2 = corpo.position.y - lane.RaioBola - pista.max.y;

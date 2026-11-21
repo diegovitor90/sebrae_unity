@@ -62,8 +62,8 @@ namespace SebraeLab.Missions
             }
             grass.SetPixels32(pixels);grass.Apply(true,true);grass.anisoLevel=8;
             // Leave the recessed bowling gutters free of terrain.
-            foreach(var rect in new[]{new Rect(-90,-85,131,170),new Rect(55,-85,35,170),
-                new Rect(41,-85,14,77),new Rect(41,8,14,77)})
+            foreach(var rect in new[]{new Rect(-90,-85,83,170),new Rect(7,-85,83,170),
+                new Rect(-7,-85,14,51),new Rect(-7,-18,14,103)})
                 Part("Gramado",new Vector3(rect.center.x,-.19f,rect.center.y),new Vector3(rect.width,.24f,rect.height),Color.white);
             foreach(int side in new[]{-1,1}){
                 Part("Cerca viva",new Vector3(side*89.7f,.5f,0),new Vector3(.6f,1.15f,170),new Color(.2f,.4f,.19f));

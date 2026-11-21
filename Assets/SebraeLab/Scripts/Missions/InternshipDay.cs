@@ -17,6 +17,7 @@ namespace SebraeLab.Missions
         readonly List<Action> ticks = new List<Action>();
         readonly List<Action> pending = new List<Action>();
         Transform area;
+        Transform descompressao;
         TextMesh status, mural;
         GameObject confirm, coffeeSpot, botaoDescompressao;
         PortaDeVidro portaDeVidro;
@@ -56,7 +57,6 @@ namespace SebraeLab.Missions
             MontarOrganizacao();
             MontarFundos();
             BuildLounge();
-            Station("RECOMEÇAR O DIA",new Vector3(50,1,-6),()=>UnityEngine.SceneManagement.SceneManager.LoadScene(gameObject.scene.name));
         }
         /// <summary>Sala 2 na Sala A do prédio: porta com maçaneta no vão do corredor e o conteúdo do escritório antigo.</summary>
         void MontarSala2()
@@ -295,6 +295,7 @@ namespace SebraeLab.Missions
             portaDeVidro.Abrir();
             placaDaPorta.text="DESCOMPRESSÃO   •   ENTRADA LIBERADA";
             botaoDescompressao.SetActive(true);
+            descompressao.gameObject.SetActive(true); Physics.SyncTransforms();
         }
         readonly List<GameObject>[] destinations={new List<GameObject>(),new List<GameObject>(),new List<GameObject>()};
         string[] jobs={"Guarde os livros na estante","Alinhe as cadeiras nas marcas","Leve os notebooks às mesas"};
@@ -359,8 +360,15 @@ namespace SebraeLab.Missions
         }
         void BuildLounge()
         {
+            // Montada com as coordenadas de antes (x de 41 a 55), dentro de uma raiz deslocada para trás da parede sul.
+            // Shape usa posição local da área; Sign, Station, luminárias e luzes recebem posição no mundo, por L().
+            descompressao=new GameObject("Descompressão (provisória)").transform;
+            descompressao.position=PlantaDaTrilha.DeslocamentoDaDescompressao;
+            var trilha=area; area=descompressao;
+            Vector3 L(Vector3 p)=>descompressao.TransformPoint(p);
+            const float guinada=PlantaDaTrilha.GuinadaDaDescompressao;
             Room("Sala de descompressão",48,14,16);
-            Sign("SALA DE DESCOMPRESSÃO",new Vector3(48,2.6f,0),.13f);
+            Sign("SALA DE DESCOMPRESSÃO",L(new Vector3(48,2.6f,0)),.13f,guinada);
             var lane=Shape("Pista de boliche",new Vector3(45,.04f,1),new Vector3(2,.08f,9),gold);
             var gutterFloors=new List<Collider>();var gutterLips=new List<Collider>();
             foreach(float side in new[]{-1f,1f})
@@ -382,12 +390,12 @@ namespace SebraeLab.Missions
                 var bounds=meshes[0].bounds;foreach(var mesh in meshes)bounds.Encapsulate(mesh.bounds);
                 lamp.transform.localScale*=.85f/Mathf.Max(bounds.size.x,bounds.size.y,bounds.size.z);
                 bounds=meshes[0].bounds;foreach(var mesh in meshes)bounds.Encapsulate(mesh.bounds);
-                lamp.transform.position+=new Vector3(x,3.16f,z)-new Vector3(bounds.center.x,bounds.max.y,bounds.center.z);
+                lamp.transform.position+=L(new Vector3(x,3.16f,z))-new Vector3(bounds.center.x,bounds.max.y,bounds.center.z);
                 var light=new GameObject("Luz quente").AddComponent<Light>();light.transform.SetParent(lamp.transform,true);
-                light.transform.position=new Vector3(x,2.9f,z);light.color=new Color(1,.89f,.73f);light.range=5;light.intensity=1.3f;light.renderMode=LightRenderMode.ForceVertex;
+                light.transform.position=L(new Vector3(x,2.9f,z));light.color=new Color(1,.89f,.73f);light.range=5;light.intensity=1.3f;light.renderMode=LightRenderMode.ForceVertex;
             }
             // Placar, rodadas e contagem ficam no BowlingLane.
-            var board=Sign("BOLICHE",new Vector3(45,2.2f,5.4f),.12f);
+            var board=Sign("BOLICHE",L(new Vector3(45,2.2f,5.4f)),.12f,guinada);
             var pins=new List<Rigidbody>();
             for(int r=0;r<4;r++)for(int c=0;c<=r;c++){
                 var p=new Vector3(45+(c-r*.5f)*.27f,.32f,3+r*.27f);var pin=Shape("Pino",p,new Vector3(.16f,.24f,.16f),Color.white,PrimitiveType.Capsule);
@@ -398,7 +406,7 @@ namespace SebraeLab.Missions
                 var belly=pin.AddComponent<SphereCollider>();belly.center=new Vector3(0,-.27f,0);belly.radius=.47f;
                 var neck=pin.AddComponent<BoxCollider>();neck.center=new Vector3(0,.48f,0);neck.size=new Vector3(.40f,.98f,.40f);
                 pins.Add(pin.AddComponent<Rigidbody>());}
-            Sign("BOLICHE • lance a bola pela pista",new Vector3(45,1.9f,-3.5f),.085f);
+            Sign("BOLICHE • lance a bola pela pista",L(new Vector3(45,1.9f,-3.5f)),.085f,guinada);
             var ballPos=new Vector3(45,.85f,-3.8f);
             Shape("Suporte da bola",ballPos-Vector3.up*.48f,new Vector3(.65f,.68f,.65f),navy);
             foreach(float side in new[]{-1f,1f})
@@ -406,8 +414,8 @@ namespace SebraeLab.Missions
             var ball=Grab(Shape("Bola de boliche",ballPos,Vector3.one*.31f,teal,PrimitiveType.Sphere));
             var bowling=gameObject.AddComponent<BowlingLane>();
             bowling.Configurar(lane.GetComponent<Collider>(),gutterFloors,gutterLips,pins,ball,board);
-            Station("REARMAR BOLICHE",new Vector3(43,1,-3),bowling.Rearmar);
-            var counter=Sign("ARCO ARCADE • 0 pontos",new Vector3(51,2.3f,5),.09f);
+            Station("REARMAR BOLICHE",L(new Vector3(43,1,-3)),bowling.Rearmar,guinada:guinada);
+            var counter=Sign("ARCO ARCADE • 0 pontos",L(new Vector3(51,2.3f,5)),.09f,guinada);
             var target=Shape("Alvo luminoso",new Vector3(51,1.5f,5),new Vector3(1.4f,1.4f,.15f),gold,PrimitiveType.Sphere);
             Shape("Suporte do arco",new Vector3(51,.45f,-2),new Vector3(1,.9f,1),navy);
             var bow=Shape("Arco arcade",new Vector3(51,1.33f,-2),new Vector3(.08f,.7f,.09f),teal);
@@ -423,10 +431,13 @@ namespace SebraeLab.Missions
             }
             Shape("Corda do arco",new Vector3(0,0,-.12f),new Vector3(.005f,1.54f,.005f),navy,parent:visual).GetComponent<Collider>().enabled=false;
             var hand=Grab(bow);
-            Sign("ARCO • segure e puxe a corda\ncom a outra mão\nPC: botão direito dispara",new Vector3(51,2,-2),.073f);
+            Sign("ARCO • segure e puxe a corda\ncom a outra mão\nPC: botão direito dispara",L(new Vector3(51,2,-2)),.073f,guinada);
             // Corda, disparo, física da flecha, anéis e placar ficam no ArcheryRange.
             gameObject.AddComponent<ArcheryRange>().Configurar(hand,visual,()=>ArcadeArrow(visual),target,counter,area);
-            Station("VOLTAR À ALA",new Vector3(48,1,-6),()=>Move(new Vector3(24,0,0)));
+            Station("VOLTAR AO PRÉDIO",L(new Vector3(48,1,-6)),()=>Move(PlantaDaTrilha.ChegadaDosFundos),guinada:guinada);
+            Station("RECOMEÇAR O DIA",L(new Vector3(50,1,-6)),()=>UnityEngine.SceneManagement.SceneManager.LoadScene(gameObject.scene.name),guinada:guinada);
+            area=trilha;
+            descompressao.gameObject.SetActive(false); // só aparece quando a porta dos fundos abre
         }
         GameObject ArcadeArrow(Transform holder)
         {

@@ -34,7 +34,7 @@ namespace SebraeLab.Editor
         }
 
         /// <summary>Seções, na ordem em que rodam. Cada tarefa do plano acrescenta as suas.</summary>
-        static readonly Func<ManagerMission, Relatorio, IEnumerator>[] Passos = { Abertura, Sala2, MuralECafe, Organizacao, PortaDosFundos };
+        static readonly Func<ManagerMission, Relatorio, IEnumerator>[] Passos = { Abertura, Sala2, MuralECafe, Organizacao, Vestigios, PortaDosFundos, Descompressao };
 
         static TrilhaCheck() { EditorApplication.update += Poll; }
 
@@ -240,6 +240,53 @@ namespace SebraeLab.Editor
             r.Check(Caminho(mission, corredor, fundos, out var d), $"aberta, chega-se aos fundos a pé ({d:0.#} m)");
             r.Check(botao && botao.activeSelf, "o botão da descompressão aparece");
             r.Check(AcharPlaca("DESCOMPRESSÃO   •   ENTRADA LIBERADA"), "a placa da porta diz que a entrada foi liberada");
+        }
+
+        static IEnumerator Vestigios(ManagerMission mission, Relatorio r)
+        {
+            r.Secao("Vestígios");
+            int erros = 0;
+            void Contar(string mensagem, string pilha, LogType tipo) { if (tipo == LogType.Error || tipo == LogType.Exception) erros++; }
+            Application.logMessageReceived += Contar;
+            yield return new WaitForSeconds(1f);
+            Application.logMessageReceived -= Contar;
+            var praca = GameObject.Find("Praça do Sebrae Lab");
+            bool DaPraca(Component c) => praca && c.transform.IsChildOf(praca.transform);
+            var visiveis = Object.FindObjectsByType<Renderer>(FindObjectsSortMode.None)
+                .Where(x => x.enabled && !DaPraca(x) && !PlantaDaTrilha.Predio.Intersects(x.bounds)).ToList();
+            r.Check(visiveis.Count == 0, $"nada visível fora do prédio além da praça ({visiveis.Count}: {string.Join(", ", visiveis.Take(5).Select(x => x.name))})");
+            var solidos = Object.FindObjectsByType<Collider>(FindObjectsSortMode.None)
+                .Where(c => c.enabled && !c.isTrigger && !DaPraca(c) && !PlantaDaTrilha.Predio.Intersects(c.bounds)).ToList();
+            r.Check(solidos.Count == 0, $"nenhum colisor fora do prédio além da praça ({solidos.Count}: {string.Join(", ", solidos.Take(5).Select(c => c.name))})");
+            var raiz = AcharObjeto("Descompressão (provisória)");
+            r.Check(raiz && !raiz.gameObject.activeSelf, "a descompressão fica desligada durante a trilha");
+            r.Check(erros == 0, $"nenhum erro no Console com a descompressão desligada ({erros})");
+        }
+
+        static IEnumerator Descompressao(ManagerMission mission, Relatorio r)
+        {
+            r.Secao("Descompressão");
+            mission.day.LiberarDescompressao();
+            yield return new WaitForSeconds(PlantaDaTrilha.TempoDaPortaDeVidro + .3f);
+            var raiz = GameObject.Find("Descompressão (provisória)");
+            r.Check(raiz, "a descompressão liga quando a porta dos fundos abre");
+            if (!raiz) yield break;
+            r.Check(!PlantaDaTrilha.Predio.Intersects(Limites(raiz)), "a descompressão fica fora do prédio, atrás da parede sul");
+            var pista = Object.FindFirstObjectByType<BowlingLane>();
+            r.Check(pista && pista.Pista && pista.Pista.transform.IsChildOf(raiz.transform), "a pista de boliche está dentro da descompressão");
+            var placas = Object.FindObjectsByType<TextMesh>(FindObjectsSortMode.None).Where(t => t.name == "Placa" && t.transform.IsChildOf(raiz.transform)).ToList();
+            r.Check(placas.Count >= 5 && placas.All(t => Mathf.Abs(Mathf.DeltaAngle(t.transform.eulerAngles.y, PlantaDaTrilha.GuinadaDaDescompressao)) < .5f),
+                $"as {placas.Count} placas da descompressão continuam a 90°");
+            var botao = Peca("SALA DE DESCOMPRESSÃO");
+            r.Check(botao && mission.day.UseStation(botao), "o botão da descompressão responde");
+            yield return null;
+            yield return null;
+            r.Check(Distancia2D(mission.playerHead.position, PlantaDaTrilha.EntradaDaDescompressao) < .6f, $"o botão leva à descompressão {Fmt(mission.playerHead.position)}");
+            var voltar = Peca("VOLTAR AO PRÉDIO");
+            r.Check(voltar && mission.day.UseStation(voltar), "o botão Voltar ao prédio responde");
+            yield return null;
+            yield return null;
+            r.Check(Distancia2D(mission.playerHead.position, PlantaDaTrilha.ChegadaDosFundos) < .6f, "Voltar ao prédio leva aos fundos");
         }
 
         // ------------------------------------------------------------------------------------------- Ajudantes
