@@ -364,7 +364,7 @@ namespace SebraeLab.Editor
             r.Secao("Painéis e paredes");
             yield return null;
 
-            var paineis = new List<(string nome, Bounds caixa, Action<bool> ligar, Plane plano, string shader)>();
+            var paineis = new List<(string nome, Bounds caixa, Action<bool> ligar, Plane plano, string shader, bool original)>();
             foreach (var c in Object.FindObjectsByType<Canvas>(FindObjectsSortMode.None)
                          .Where(c => c.isRootCanvas && c.renderMode == RenderMode.WorldSpace && c.gameObject.activeInHierarchy))
             {
@@ -376,24 +376,26 @@ namespace SebraeLab.Editor
                 var nome = c.transform.parent && (c.name == "Frente" || c.name == "Verso") ? $"{c.transform.parent.name} • {c.name}" : c.name;
                 var grafico = c.GetComponentInChildren<UnityEngine.UI.Text>();
                 paineis.Add((nome, caixa, ligado => canvas.enabled = ligado, new Plane(c.transform.forward, c.transform.position),
-                    grafico ? grafico.materialForRendering.shader.name : "?"));
+                    grafico ? grafico.materialForRendering.shader.name : "?", c.enabled));
             }
             foreach (var t in Object.FindObjectsByType<TextMesh>(FindObjectsSortMode.None).Where(t => t.gameObject.activeInHierarchy))
             {
                 var render = t.GetComponent<MeshRenderer>();
                 if (!render) continue;
                 paineis.Add(($"{t.name} \"{t.text.Replace('\n', ' ')}\"", render.bounds, ligado => render.enabled = ligado,
-                    new Plane(t.transform.forward, t.transform.position), render.sharedMaterial ? render.sharedMaterial.shader.name : "?"));
+                    new Plane(t.transform.forward, t.transform.position), render.sharedMaterial ? render.sharedMaterial.shader.name : "?", render.enabled));
             }
             r.Info($"{paineis.Count} painéis e placas ativos medidos");
 
             var objetoCamera = new GameObject("Câmera dos painéis");
+            var alvo = new RenderTexture(160, 160, 24);
+            var textura = new Texture2D(160, 160, TextureFormat.RGB24, false);
+            try
+            {
             var camera = objetoCamera.AddComponent<Camera>();
             camera.fieldOfView = 40f; camera.nearClipPlane = .05f; camera.farClipPlane = 60f;
             camera.clearFlags = CameraClearFlags.SolidColor; camera.backgroundColor = Color.black;
-            var alvo = new RenderTexture(160, 160, 24);
             camera.targetTexture = alvo;
-            var textura = new Texture2D(160, 160, TextureFormat.RGB24, false);
             Color32[] Foto()
             {
                 RenderTexture.active = alvo;
@@ -440,6 +442,23 @@ namespace SebraeLab.Editor
                     if (Mathf.Abs(com[i].r - sem[i].r) + Mathf.Abs(com[i].g - sem[i].g) + Mathf.Abs(com[i].b - sem[i].b) > 24) n++;
                 return n;
             }
+            // Cada pixel que mudou tem a própria linha de visão até o plano do painel: livre, através de vidro ou através de
+            // superfície opaca. O veredito e o controle negativo usam esta mesma conta.
+            (int livres, int porVidro, int porOpaco) Classificar(Color32[] com, Color32[] sem, Plane plano)
+            {
+                int livres = 0, porVidro = 0, porOpaco = 0;
+                for (int i = 0; i < com.Length; i++)
+                {
+                    if (Mathf.Abs(com[i].r - sem[i].r) + Mathf.Abs(com[i].g - sem[i].g) + Mathf.Abs(com[i].b - sem[i].b) <= 24) continue;
+                    var raio = camera.ViewportPointToRay(new Vector3((i % 160 + .5f) / 160f, (i / 160 + .5f) / 160f, 0f));
+                    if (!plano.Raycast(raio, out var ate)) continue;
+                    if (!Physics.Raycast(raio, out var antes, ate - .02f, ~0, QueryTriggerInteraction.Ignore)) livres++;
+                    else if (Opaco(antes)) porOpaco++;
+                    else porVidro++;
+                }
+                return (livres, porVidro, porOpaco);
+            }
+            const int PixelsDeFalha = 12;
 
             // Controle: de frente, a 2 m e sem nada no meio, a medição precisa enxergar o painel da conversa.
             var conversa = paineis.FirstOrDefault(p => p.nome == "Conversa com o gerente");
@@ -450,9 +469,73 @@ namespace SebraeLab.Editor
                 objetoCamera.transform.SetPositionAndRotation(olhoDeControle, Quaternion.LookRotation(conversa.caixa.center - olhoDeControle));
                 conversa.ligar(true); var com = Foto();
                 conversa.ligar(false); var sem = Foto();
-                conversa.ligar(true);
+                conversa.ligar(conversa.original);
                 int vistos = Diferentes(com, sem);
-                r.Check(vistos > 12, $"controle: sem parede no meio, a medição enxerga o painel da conversa ({vistos} pixels mudam)");
+                r.Check(vistos > PixelsDeFalha, $"controle: sem parede no meio, a medição enxerga o painel da conversa ({vistos} pixels mudam)");
+
+                // Controle negativo: um cubo opaco no meio e o painel forçado a desenhar por cima de tudo (ZTest Always).
+                // A mesma classificação do veredito precisa apontar o caso como texto atrás de parede opaca.
+                var graficos = canvasDaConversa.GetComponentsInChildren<UnityEngine.UI.Graphic>();
+                var materiaisOriginais = graficos.Select(g => g.material).ToArray();
+                var forcados = new List<Material>();
+                var cubo = GameObject.CreatePrimitive(PrimitiveType.Cube);
+                cubo.name = "Cubo do controle negativo (painéis)";
+                try
+                {
+                    cubo.transform.SetPositionAndRotation(Vector3.Lerp(olhoDeControle, conversa.caixa.center, .5f), objetoCamera.transform.rotation);
+                    cubo.transform.localScale = new Vector3(1.6f, 1.2f, .1f);
+                    Physics.SyncTransforms();
+                    bool cuboOpaco = Physics.Raycast(olhoDeControle, conversa.caixa.center - olhoDeControle, out var noCubo, 2f, ~0, QueryTriggerInteraction.Ignore)
+                        && noCubo.collider.gameObject == cubo && Opaco(noCubo);
+                    r.Check(cuboOpaco, "controle negativo: o cubo opaco fica entre a câmera e o painel e a medição o reconhece como opaco");
+                    conversa.ligar(true); var semForcar = Foto(); conversa.ligar(false); var semPainel = Foto();
+                    var normal = Classificar(semForcar, semPainel, conversa.plano);
+                    r.Info($"controle negativo, material normal (UI/Default): {Diferentes(semForcar, semPainel)} pixels mudam, {normal.porOpaco} através de parede opaca");
+
+                    // Jeito 1: a propriedade do UI/Default. Jeito 2, se o Canvas a sobrescrever: GUI/Text Shader, que tem ZTest Always fixo.
+                    var jeitos = new (string nome, Func<UnityEngine.UI.Graphic, Material> material)[]
+                    {
+                        ("UI/Default com unity_GUIZTestMode = Always", g =>
+                        {
+                            var m = new Material(g.materialForRendering);
+                            m.SetInt("unity_GUIZTestMode", (int)UnityEngine.Rendering.CompareFunction.Always);
+                            return m;
+                        }),
+                        ("GUI/Text Shader (ZTest Always)", g =>
+                        {
+                            var m = new Material(Shader.Find("GUI/Text Shader"));
+                            m.mainTexture = g.mainTexture;
+                            return m;
+                        }),
+                    };
+                    bool apontou = false;
+                    foreach (var jeito in jeitos)
+                    {
+                        for (int i = 0; i < graficos.Length; i++)
+                        {
+                            var m = jeito.material(graficos[i]);
+                            forcados.Add(m);
+                            graficos[i].material = m;
+                        }
+                        conversa.ligar(true); var comForcado = Foto(); conversa.ligar(false); var semForcado = Foto();
+                        var conta = Classificar(comForcado, semForcado, conversa.plano);
+                        r.Info($"controle negativo, {jeito.nome}: {Diferentes(comForcado, semForcado)} pixels mudam " +
+                               $"({conta.livres} com visão livre, {conta.porVidro} através de vidro, {conta.porOpaco} através de parede opaca)");
+                        for (int i = 0; i < graficos.Length; i++) graficos[i].material = materiaisOriginais[i];
+                        if (conta.porOpaco > PixelsDeFalha) { apontou = true; break; }
+                    }
+                    r.Check(apontou, apontou ? "controle negativo: texto com ZTest Always atrás de um cubo opaco é apontado como atravessando parede"
+                        : "controle negativo: texto forçado por cima de um cubo opaco NÃO foi apontado; a medição está cega");
+                }
+                finally
+                {
+                    for (int i = 0; i < graficos.Length; i++) if (graficos[i]) graficos[i].material = materiaisOriginais[i];
+                    foreach (var m in forcados) Object.Destroy(m);
+                    conversa.ligar(conversa.original);
+                    cubo.SetActive(false); // Destroy só vale no fim do quadro: desligado, já não entra nos raios do veredito
+                    Object.Destroy(cubo);
+                    Physics.SyncTransforms();
+                }
             }
             else r.Check(false, "controle: painel \"Conversa com o gerente\" não encontrado");
 
@@ -492,42 +575,39 @@ namespace SebraeLab.Editor
                     var com = Foto();
                     p.ligar(false);
                     var sem = Foto();
-                    p.ligar(true);
+                    p.ligar(p.original);
                     fotos += 2;
                     casosPorPainel[k] = casos + 1;
                     int diferentes = Diferentes(com, sem);
-                    if (diferentes <= 12) continue;
+                    if (diferentes <= PixelsDeFalha) continue;
                     // O raio do centro bateu em algo opaco, mas o painel é largo: cada pixel que mudou tem a própria linha de
                     // visão. Só conta como "através da parede" o pixel cuja primeira superfície no caminho é opaca; atrás de
                     // vidro (caixilho ao lado) o painel é visível de verdade.
-                    int livres = 0, porVidro = 0, porOpaco = 0;
-                    for (int i = 0; i < com.Length; i++)
-                    {
-                        if (Mathf.Abs(com[i].r - sem[i].r) + Mathf.Abs(com[i].g - sem[i].g) + Mathf.Abs(com[i].b - sem[i].b) <= 24) continue;
-                        var raio = camera.ViewportPointToRay(new Vector3((i % 160 + .5f) / 160f, (i / 160 + .5f) / 160f, 0f));
-                        if (!p.plano.Raycast(raio, out var ate)) continue;
-                        if (!Physics.Raycast(raio, out var antes, ate - .02f, ~0, QueryTriggerInteraction.Ignore)) livres++;
-                        else if (Opaco(antes)) porOpaco++;
-                        else porVidro++;
-                    }
+                    var (livres, porVidro, porOpaco) = Classificar(com, sem, p.plano);
                     r.Info($"{p.nome} visto de {Fmt(cabeca)} com o centro atrás de {parede.collider.name}: {diferentes} pixels mudam " +
                            $"({livres} com visão livre, {porVidro} através de vidro, {porOpaco} através de parede opaca); shader {p.shader}");
-                    if (porOpaco <= 12) continue;
+                    if (porOpaco <= PixelsDeFalha) continue;
                     File.WriteAllBytes($"Logs/paineis-{falhas.Count}-com.png", Png(com));
                     File.WriteAllBytes($"Logs/paineis-{falhas.Count}-sem.png", Png(sem));
                     falhas.Add($"{p.nome} aparece através de {parede.collider.name}, visto de {Fmt(cabeca)} ({porOpaco} pixels atrás de parede opaca)");
                 }
                 yield return null;
             }
-            Object.Destroy(objetoCamera);
-            Object.Destroy(textura);
-            alvo.Release();
             r.Check(fotos > 0, $"a medição fotografou {fotos / 2} casos de parede opaca entre a pessoa e o painel, cobrindo {casosPorPainel.Count} dos {paineis.Count} painéis e placas");
             r.Check(fotos < limiteDeFotos, $"a amostra percorreu o prédio inteiro antes do limite de {limiteDeFotos} fotos");
             r.Check(falhas.Count == 0, falhas.Count == 0 ? "nenhum painel ou placa aparece através de parede opaca"
                 : $"{falhas.Count} casos, por exemplo: {string.Join(" | ", falhas.Take(3))}");
             foreach (var f in falhas.Skip(3).Take(20)) r.Info(f);
             r.Info(atrasDeVidro.Count == 0 ? "nenhum painel visto através de vidro" : $"vistos através de vidro ({atrasDeVidro.Count}): {string.Join(" | ", atrasDeVidro.Take(40))}");
+            }
+            finally
+            {
+                foreach (var p in paineis) p.ligar(p.original);
+                Object.Destroy(objetoCamera);
+                Object.Destroy(textura);
+                alvo.Release();
+                Object.Destroy(alvo);
+            }
         }
 
         /// <summary>
