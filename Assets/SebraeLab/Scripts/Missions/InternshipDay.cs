@@ -49,8 +49,6 @@ namespace SebraeLab.Missions
             foreach(Transform mark in mission.routeMarkers.transform) mark.gameObject.SetActive(false);
             foreach(var waypoint in new[]{new Vector3(5.7f,0,8),new Vector3(6,0,10),new Vector3(9,0,11),new Vector3(12,0,11),new Vector3(14,0,10),new Vector3(14,0,7),new Vector3(14,0,4),new Vector3(14,0,1),new Vector3(15,0,0)})
                 Shape("Marca de percurso",waypoint+Vector3.up*.015f,new Vector3(.30f,.018f,.30f),teal,parent:mission.routeMarkers.transform);
-            foreach(var panel in FindObjectsByType<MeshCollider>(FindObjectsSortMode.None))
-                if(panel.name=="Porta Entrada") panel.transform.position+=Vector3.left*3.2f;
             PassageFloor("Galeria da praça",new Vector3(14,-.11f,2.5f),new Vector3(4,.20f,9));
             PassageFloor("Piso do escritório",new Vector3(18,-.1f,0),new Vector3(4,.2f,5.2f));
             PassageFloor("Galeria de descompressão",new Vector3(36.5f,-.1f,0),new Vector3(9,.2f,3.2f));
