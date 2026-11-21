@@ -34,7 +34,7 @@ namespace SebraeLab.Editor
         }
 
         /// <summary>Seções, na ordem em que rodam. Cada tarefa do plano acrescenta as suas.</summary>
-        static readonly Func<ManagerMission, Relatorio, IEnumerator>[] Passos = { Abertura, Sala2, MuralECafe, Organizacao, Vestigios, PortaDosFundos, Descompressao };
+        static readonly Func<ManagerMission, Relatorio, IEnumerator>[] Passos = { Abertura, Sala2, MuralECafe, Organizacao, Vestigios, Guia, Seta, PortaDosFundos, Descompressao };
 
         static TrilhaCheck() { EditorApplication.update += Poll; }
 
@@ -261,6 +261,58 @@ namespace SebraeLab.Editor
             var raiz = AcharObjeto("Descompressão (provisória)");
             r.Check(raiz && !raiz.gameObject.activeSelf, "a descompressão fica desligada durante a trilha");
             r.Check(erros == 0, $"nenhum erro no Console com a descompressão desligada ({erros})");
+        }
+
+        static IEnumerator Guia(ManagerMission mission, Relatorio r)
+        {
+            r.Secao("Feixe");
+            yield return null;
+            var feixes = Object.FindObjectsByType<Feixe>(FindObjectsInactive.Include, FindObjectsSortMode.None);
+            r.Check(feixes.Length == 1, $"um feixe só na cena ({feixes.Length})");
+            if (feixes.Length != 1) yield break;
+            var feixe = feixes[0];
+            r.Check(Vector3.Distance(feixe.transform.position, GuiaDaTrilha.Destino(mission.day.Estado())) < .01f, "o feixe está onde a guia manda");
+            r.Check(mission.State != ManagerMissionState.FindManager || Vector3.Distance(feixe.transform.position, PlantaDaTrilha.FeixeDoGerente) < .01f,
+                "no começo, o feixe está diante do gerente");
+            var pintor = feixe.GetComponent<MeshRenderer>();
+            r.Check(pintor && pintor.sharedMaterial && pintor.sharedMaterial.shader.name == "SebraeLab/Feixe", "material com o shader SebraeLab/Feixe");
+            var tamanho = pintor ? pintor.bounds.size : Vector3.zero;
+            r.Check(Mathf.Abs(tamanho.x - Feixe.Diametro) < .05f && Mathf.Abs(tamanho.y - Feixe.Altura) < .05f,
+                $"feixe de {tamanho.x:0.##} m de diâmetro por {tamanho.y:0.##} m de altura");
+            var cabecaOriginal = feixe.cabeca;
+            var cabecaDeTeste = new GameObject("Cabeça de teste (trilha)").transform;
+            feixe.cabeca = cabecaDeTeste;
+            cabecaDeTeste.position = feixe.transform.position + Vector3.up * 1.6f;
+            yield return new WaitForSeconds(.6f);
+            float perto = feixe.Brilho;
+            cabecaDeTeste.position = feixe.transform.position + new Vector3(4f, 1.6f, 0f);
+            yield return new WaitForSeconds(.6f);
+            float longe = feixe.Brilho;
+            feixe.cabeca = cabecaOriginal;
+            Object.Destroy(cabecaDeTeste.gameObject);
+            r.Check(perto <= Feixe.BrilhoDePerto + .01f, $"de perto, o feixe esmaece (brilho {perto:0.##})");
+            r.Check(longe >= Feixe.BrilhoMinimoDoPulso - .01f, $"de longe, volta ao brilho do pulso (brilho {longe:0.##})");
+        }
+
+        static IEnumerator Seta(ManagerMission mission, Relatorio r)
+        {
+            r.Secao("Seta do pulso");
+            yield return null;
+            var seta = Object.FindObjectsByType<SetaDoPulso>(FindObjectsInactive.Include, FindObjectsSortMode.None).FirstOrDefault();
+            r.Check(seta && seta.name == "Left Controller", "a seta fica no controle esquerdo");
+            if (!seta) yield break;
+            var alvo = PlantaDaTrilha.FeixeDoGerente;
+            var olho = PlantaDaTrilha.Nascimento + Vector3.up * 1.6f;
+            seta.Atualizar(olho, alvo - olho, alvo);
+            r.Check(!seta.Seta.gameObject.activeSelf, "olhando para o feixe, a seta some");
+            seta.Atualizar(olho, Vector3.right, alvo); // olhando para leste, o gerente fica atrás
+            r.Check(seta.Seta.gameObject.activeSelf, "de costas para o feixe, a seta aparece");
+            var direcao = alvo - seta.Seta.position;
+            direcao.y = 0f;
+            r.Check(Vector3.Angle(seta.Seta.forward, direcao) < 2f, "a seta aponta para o feixe no plano do chão");
+            r.Check(seta.Seta.GetComponentsInChildren<Transform>(true).Where(t => t.name == "Haste").All(t => t.localScale.z <= SetaDoPulso.Tamanho),
+                "a seta é pequena (cerca de 8 cm)");
+            r.Check(mission.day.SetaDoHud() != null, "o HUD do PC tem a seta de texto");
         }
 
         static IEnumerator Descompressao(ManagerMission mission, Relatorio r)

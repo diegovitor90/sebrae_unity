@@ -193,6 +193,8 @@ namespace SebraeLab.Missions
             if(mission && mission.day){
                 float width=Mathf.Min(460,Screen.width-16);
                 GUI.Box(new Rect(8,59,width,50),mission.day.Objective());
+                var setaDoHud=mission.day.SetaDoHud();
+                if(setaDoHud.Length>0) GUI.Box(new Rect(8,111,width,26),setaDoHud);
             }
             GUI.Box(new Rect(8, 8, Mathf.Min(440, Screen.width-16), 48),
                 Cursor.lockState != CursorLockMode.Locked ? "Clique para jogar com mouse e teclado" :

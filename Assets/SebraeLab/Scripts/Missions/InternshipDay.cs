@@ -17,6 +17,7 @@ namespace SebraeLab.Missions
         readonly List<Action> ticks = new List<Action>();
         readonly List<Action> pending = new List<Action>();
         Transform area;
+        Feixe feixe; SetaDoPulso seta;
         Transform descompressao;
         TextMesh status, mural;
         GameObject confirm, coffeeSpot, botaoDescompressao;
@@ -57,6 +58,13 @@ namespace SebraeLab.Missions
             MontarOrganizacao();
             MontarFundos();
             BuildLounge();
+            feixe=Feixe.Criar(area,mission.playerHead);
+            // No PC, o DesktopPlayer já trocou o playerRoot e desligou o rig VR; o controle é procurado na cena toda, preferindo o ativo.
+            Transform esquerdo=null;
+            foreach(var t in FindObjectsByType<Transform>(FindObjectsInactive.Include,FindObjectsSortMode.None))
+                if(t.name=="Left Controller" && (!esquerdo || t.gameObject.activeInHierarchy)) esquerdo=t;
+            if(esquerdo) seta=SetaDoPulso.Criar(esquerdo,mission.playerHead,()=>feixe.transform.position);
+            ticks.Add(()=>feixe.Mover(GuiaDaTrilha.Destino(Estado())));
         }
         /// <summary>Sala 2 na Sala A do prédio: porta com maçaneta no vão do corredor e o conteúdo do escritório antigo.</summary>
         void MontarSala2()
@@ -297,6 +305,22 @@ namespace SebraeLab.Missions
             botaoDescompressao.SetActive(true);
             descompressao.gameObject.SetActive(true); Physics.SyncTransforms();
         }
+
+        /// <summary>O que a sinalização precisa saber agora (ver GuiaDaTrilha).</summary>
+        public EstadoDaTrilha Estado()
+        {
+            var e=new EstadoDaTrilha{Gerente=mission.State,Etapa=etapas.Atual,CafeNaMao=coffeeCollected,PortaDosFundosAberta=portaDosFundosAberta};
+            if(etapas.Em(EtapaExpediente.Organizacao) && placed<ItemCount)
+            {
+                var pendentes=itens[placed/2];
+                if(itemNaMao && pendentes.Contains(itemNaMao) && assigned.TryGetValue(itemNaMao,out var destino)) e.DestinoDoItemNaMao=destino.transform.position;
+                else if(pendentes.Count>0) e.ProximoItem=pendentes[0].transform.position;
+            }
+            return e;
+        }
+
+        /// <summary>Seta de texto do HUD do PC, vazia quando o feixe está na vista.</summary>
+        public string SetaDoHud()=>feixe && mission.playerHead ? GuiaDaTrilha.SetaDoHud(mission.playerHead.position,mission.playerHead.forward,feixe.transform.position) : "";
         readonly List<GameObject>[] destinations={new List<GameObject>(),new List<GameObject>(),new List<GameObject>()};
         string[] jobs={"Guarde os livros na estante","Alinhe as cadeiras nas marcas","Leve os notebooks às mesas"};
         void ShowDeliveryTargets(){
