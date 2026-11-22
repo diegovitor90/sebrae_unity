@@ -20,6 +20,9 @@ namespace SebraeLab.Editor
         public static void AjustarCena()
         {
             if (EditorApplication.isPlayingOrWillChangePlaymode) throw new InvalidOperationException("Pare o Play antes de ajustar a cena.");
+            // OpenScene descarta alterações não salvas da cena aberta; em lote não há ninguém para perguntar.
+            if (!Application.isBatchMode && !EditorSceneManager.SaveCurrentModifiedScenesIfUserWantsTo())
+                throw new InvalidOperationException("Cancelado: a cena aberta tem alterações não salvas.");
             var cena = EditorSceneManager.OpenScene(ManagerMissionSetup.MissionScene);
             var missao = Object.FindFirstObjectByType<ManagerMission>();
             if (!missao || !missao.manager) throw new InvalidOperationException("ManagerMission ou gerente ausente na cena.");

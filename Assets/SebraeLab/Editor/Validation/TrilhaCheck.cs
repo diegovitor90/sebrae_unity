@@ -39,6 +39,8 @@ namespace SebraeLab.Editor
         static readonly Func<ManagerMission, Relatorio, IEnumerator>[] Passos = { Abertura, Sala2, MuralECafe, Organizacao, Vestigios, Guia, Seta, ForaDeOrdem,
             PortaDosFundos, Caminhada, Descompressao, PaineisEParedes, Simulador, Orcamento };
 
+        static DateTime pedidoCancelado;
+
         static TrilhaCheck() { EditorApplication.update += Poll; }
 
         [MenuItem("Sebrae Lab/Verificação/Trilha no prédio")]
@@ -52,7 +54,23 @@ namespace SebraeLab.Editor
                 if (!EditorApplication.isPlayingOrWillChangePlaymode)
                 {
                     // O editor pode abrir sem cena (Untitled): abre a da missão antes de entrar em Play.
-                    if (SceneManager.GetActiveScene().path != ManagerMissionSetup.MissionScene) EditorSceneManager.OpenScene(ManagerMissionSetup.MissionScene);
+                    if (SceneManager.GetActiveScene().path != ManagerMissionSetup.MissionScene)
+                    {
+                        // OpenScene descarta alterações não salvas. Se a pessoa cancelar, o pedido fica no disco e só volta a
+                        // perguntar quando o arquivo for regravado (o menu regrava), para o diálogo não reaparecer a cada tick.
+                        if (!Application.isBatchMode)
+                        {
+                            var pedido = File.GetLastWriteTimeUtc(Request);
+                            if (pedido == pedidoCancelado) return;
+                            if (!EditorSceneManager.SaveCurrentModifiedScenesIfUserWantsTo())
+                            {
+                                pedidoCancelado = pedido;
+                                Debug.LogWarning("Trilha no prédio adiada: a cena aberta tem alterações não salvas. Use o menu de novo para tentar outra vez.");
+                                return;
+                            }
+                        }
+                        EditorSceneManager.OpenScene(ManagerMissionSetup.MissionScene);
+                    }
                     EditorApplication.EnterPlaymode();
                 }
                 return;
