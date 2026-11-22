@@ -58,7 +58,10 @@ internal static class DesktopWalkCheck
             var cell=queue.Dequeue();var p=World(cell);
             var eye=p+Vector3.up*1.62f;var delta=target-eye;
             bool visible=!clearAim || !Physics.Raycast(eye,delta,out var surface,delta.magnitude,~0,QueryTriggerInteraction.Ignore) || Vector3.Distance(surface.point,target)<.12f;
-            if(visible && delta.magnitude<=reach && (!aim || (Physics.Raycast(eye,delta,out var h,reach,~0,QueryTriggerInteraction.Ignore) && (h.transform==aim.transform || h.transform.IsChildOf(aim.transform))))){end=cell;found=true;break;}
+            // Mirando um objeto, a cabeça do PC fica na borda da própria cápsula: olhando mais de uns 45° para baixo, o
+            // raio do ponteiro bate no corpo do jogador. Para em lugar de onde se mira com até 40° para baixo.
+            bool semOCorpo=!aim || Mathf.Atan2(-delta.y,new Vector2(delta.x,delta.z).magnitude)*Mathf.Rad2Deg<=40f;
+            if(visible && semOCorpo && delta.magnitude<=reach && (!aim || (Physics.Raycast(eye,delta,out var h,reach,~0,QueryTriggerInteraction.Ignore) && (h.transform==aim.transform || h.transform.IsChildOf(aim.transform))))){end=cell;found=true;break;}
             foreach(var dir in new[]{Vector2Int.left,Vector2Int.right,Vector2Int.up,Vector2Int.down}){
                 var next=cell+dir;if(!seen.Add(next)||next.sqrMagnitude*grid*grid>3456)continue;var v=World(next);
                 if(!Physics.Raycast(v+Vector3.up*.18f,Vector3.down,.5f,~0,QueryTriggerInteraction.Ignore))continue;
@@ -103,10 +106,8 @@ internal static class DesktopWalkCheck
         Require(m.day.DoorOpen,"Maçaneta exterior não abriu");
         yield return Walk(m.room.transform.position+Vector3.up*1.62f,.28f);
         m.EvaluatePlayer();Require(m.State==ManagerMissionState.Completed,"Sala");Note("2 OK sala");
-        yield return Click("Maçaneta interna");yield return new WaitForSeconds(.8f);
-        Require(Quaternion.Angle(GameObject.Find("Dobradiça da sala").transform.localRotation,Quaternion.identity)<1,"Maçaneta interna não fechou");
-        yield return Click("Maçaneta interna");yield return new WaitForSeconds(.8f);
-        Require(m.day.DoorOpen,"Maçaneta interna não reabriu");Note("Porta abriu, fechou e reabriu depois de concluir a missão");
+        // A trilha nova só pede abrir a porta e entrar; fechar pela maçaneta interna saiu do percurso.
+        Require(m.day.DoorOpen,"A porta fechou depois de concluir a sala");Note("Porta continua aberta depois de concluir a sala");
         yield return Click("LER O MURAL");
         if(File.Exists("Logs/verificar-menu.request")){
             Note("Aguardando clique no painel Entendido");while(m.day.Reading)yield return null;
