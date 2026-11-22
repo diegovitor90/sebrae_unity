@@ -37,7 +37,7 @@ namespace SebraeLab.Missions
             mission = manager;
             if (!TryGetComponent(out etapas)) etapas = gameObject.AddComponent<MissionManager>();
             area = new GameObject("Missão Estágio • percurso").transform;
-            Sign("PRIMEIRO DIA\nProcure o gestor do espaço",new Vector3(3.9f,1.9f,7.4f),.067f);
+            Sign("PRIMEIRO DIA\nProcure o gestor do espaço",new Vector3(3.9f,1.9f,7.4f),.067f,270f); // lida por quem nasce a leste, olhando para o gerente (−X)
             Music();
             hinge = new GameObject("Dobradiça da sala").transform;
             door = hinge.gameObject.AddComponent<HandDoor>();
@@ -155,15 +155,8 @@ namespace SebraeLab.Missions
             surfaces.Apply(g,name);
             return g;
         }
-        TextMesh Sign(string value,Vector3 pos,float size)
-        {
-            var g=new GameObject("Placa");g.transform.SetParent(area);g.transform.position=pos;
-            var t=g.AddComponent<TextMesh>();
-            t.font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
-            g.GetComponent<MeshRenderer>().sharedMaterial = t.font.material;
-            t.fontSize=72;t.characterSize=size*.1f;t.anchor=TextAnchor.MiddleCenter;t.alignment=TextAlignment.Center;t.text=value;
-            ticks.Add(()=>{var d=t.transform.position-mission.playerHead.position;d.y=0;if(d.sqrMagnitude>.001f)t.transform.rotation=Quaternion.LookRotation(d);});return t;
-        }
+        // Placa parada, em caixa, legível dos dois lados e escondida por paredes (ver Placa).
+        TextMesh Sign(string value,Vector3 pos,float size,float? guinada=null) => Placa.Criar(value,pos,size,area,guinada);
         // Objetos clicáveis no modo PC que não são botões de missão (maçanetas).
         readonly Dictionary<GameObject, Action> desktopActions = new Dictionary<GameObject, Action>();
         // Botões de missão, pela raiz (que tem o colisor da mira do PC) e pelo painel do mural.
@@ -186,11 +179,9 @@ namespace SebraeLab.Missions
         {
             // A ação entra na fila e roda no Update: evita mexer na cena dentro do evento de UI.
             var button=MissionButton.Criar(caption,area,p+Vector3.up*.25f,new Vector2(1.1f,.3f),()=>pending.Add(action),etapas,etapa);
-            var root=button.transform.parent.gameObject;
-            ticks.Add(()=>{
-                var direction=root.transform.position-mission.playerHead.position;direction.y=0;
-                if(direction.sqrMagnitude>.001f)root.transform.rotation=Quaternion.LookRotation(direction);
-            });
+            var root=button.Peca; // corpo e as duas faces: SetActive(false) esconde tudo
+            // Parado: a direção é a do trecho, definida uma vez, sem girar para o jogador.
+            root.transform.rotation=Quaternion.Euler(0f,Placa.GuinadaPadrao(root.transform.position),0f);
             stations[root]=button;
             return root;
         }
@@ -249,8 +240,8 @@ namespace SebraeLab.Missions
             mural=Sign("MURAL DO CONHECIMENTO",new Vector3(22,1.95f,2),.085f);
             // Liberado a partir do Mural: pode ser relido depois, como antes.
             var muralButton=Station("LER O MURAL",new Vector3(22,1,2),()=>{if(!etapas.Alcancou(EtapaExpediente.Mural))return;mural.text="SEBRAE LAB\nUm espaço para experimentar ideias,\ntrocar experiências e aprender em grupo.";confirm.SetActive(true);Cursor.lockState=CursorLockMode.None;},EtapaExpediente.Mural);
-            var panelHit=mural.gameObject.AddComponent<BoxCollider>();
-            panelHit.size=new Vector3(2.1f,.8f,.1f);
+            mural.gameObject.AddComponent<BoxCollider>();
+            mural.GetComponent<Placa>().colisorMinimo=new Vector3(2.1f,.8f,.1f); // área de clique do PC: nunca menor que a de antes
             stations[mural.gameObject]=stations[muralButton];
             confirm=Station("ENTENDIDO",new Vector3(23.8f,1,2),()=>{confirm.SetActive(false);Cursor.lockState=CursorLockMode.Locked;if(!etapas.Em(EtapaExpediente.Mural))return;etapas.Concluir(EtapaExpediente.Mural);coffee.enabled=true;coffeeSpot.SetActive(true);mural.text="MURAL DO CONHECIMENTO";});confirm.SetActive(false);
             Shape("Balcão da copa",new Vector3(26,.45f,3),new Vector3(2,.9f,.8f),teal);
