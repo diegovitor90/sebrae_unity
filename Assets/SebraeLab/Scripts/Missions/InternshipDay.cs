@@ -244,8 +244,15 @@ namespace SebraeLab.Missions
             coffeeLabel.transform.SetParent(coffeeSpot.transform,true);
             coffeeSpot.SetActive(false);
             coffee.selectEntered.AddListener(e=>{if(etapas.Em(EtapaExpediente.Cafe))coffeeCollected=true;});
+            var coffeeStart=coffee.transform.position;var coffeeRot=coffee.transform.rotation;
             coffee.selectExited.AddListener(e=>{
-                if(!etapas.Em(EtapaExpediente.Cafe) || Vector3.Distance(coffee.GetComponent<Rigidbody>().position,saucer+Vector3.up*.11f)>.35f)return;
+                coffeeCollected=false; // só vale com o copo na mão (o modo PC dispara os eventos sem isSelected)
+                if(!etapas.Em(EtapaExpediente.Cafe))return;
+                if(Vector3.Distance(coffee.GetComponent<Rigidbody>().position,saucer+Vector3.up*.11f)>.35f){
+                    // Solto longe do pires: volta à bancada da copa, onde o feixe aponta.
+                    pending.Add(()=>{if(etapas.Em(EtapaExpediente.Cafe) && !coffeeCollected)ResetBody(coffee.GetComponent<Rigidbody>(),coffeeStart,coffeeRot);});
+                    return;
+                }
                 pending.Add(()=>{
                     if(!etapas.Em(EtapaExpediente.Cafe))return;
                     coffee.enabled=false;
