@@ -20,7 +20,9 @@ namespace SebraeLab.Missions
         Feixe feixe; SetaDoPulso seta;
         Transform descompressao;
         TextMesh status, mural;
-        GameObject confirm, coffeeSpot, botaoDescompressao;
+        GameObject confirm, coffeeSpot;
+        Passagem passagem;
+        PortaDoAnexo portaDeIda, portaDeVolta;
         PortaDeVidro portaDeVidro;
         TextMesh placaDaPorta;
         bool portaDosFundosAberta;
@@ -56,6 +58,7 @@ namespace SebraeLab.Missions
             MontarMural();
             MontarCafe();
             MontarOrganizacao();
+            passagem=Passagem.Criar(area,mission.playerHead,MoverEVirar);
             MontarFundos();
             BuildLounge();
             feixe=Feixe.Criar(area,mission.playerHead);
@@ -64,7 +67,14 @@ namespace SebraeLab.Missions
             foreach(var t in FindObjectsByType<Transform>(FindObjectsInactive.Include,FindObjectsSortMode.None))
                 if(t.name=="Left Controller" && (!esquerdo || t.gameObject.activeInHierarchy)) esquerdo=t;
             if(esquerdo) seta=SetaDoPulso.Criar(esquerdo,mission.playerHead,()=>feixe.transform.position);
-            ticks.Add(()=>feixe.Mover(GuiaDaTrilha.Destino(Estado())));
+            ticks.Add(()=>
+            {
+                var estado=Estado();
+                // No anexo a trilha acabou: o feixe e a seta se apagam e voltam ao sair.
+                if(feixe.gameObject.activeSelf==estado.NoAnexo) feixe.gameObject.SetActive(!estado.NoAnexo);
+                if(seta && seta.enabled==estado.NoAnexo){ seta.enabled=!estado.NoAnexo; if(estado.NoAnexo) seta.Seta.gameObject.SetActive(false); }
+                feixe.Mover(GuiaDaTrilha.Destino(estado));
+            });
         }
         /// <summary>Sala 2 na Sala A do prédio: porta com maçaneta no vão do corredor e o conteúdo do escritório antigo.</summary>
         void MontarSala2()
@@ -141,6 +151,42 @@ namespace SebraeLab.Missions
             if(enabled)cc.enabled=false;
             rig.position+=new Vector3(p.x-head.position.x,p.y-rig.position.y,p.z-head.position.z);
             if(enabled)cc.enabled=true;
+        }
+        /// <summary>Gira o jogador em volta da cabeça para olhar na guinada dada e põe a cabeça na posição (no chão).</summary>
+        void MoverEVirar(Vector3 p,float guinada)
+        {
+            var rig=mission.playerRoot; var head=mission.playerHead;
+            var cc=rig.GetComponent<CharacterController>(); bool enabled=cc && cc.enabled;
+            if(enabled)cc.enabled=false;
+            var frente=head.forward; frente.y=0f;
+            float atual=frente.sqrMagnitude>1e-6f?Quaternion.LookRotation(frente).eulerAngles.y:rig.eulerAngles.y;
+            rig.RotateAround(head.position,Vector3.up,Mathf.DeltaAngle(atual,guinada));
+            if(enabled)cc.enabled=true;
+            Move(p);
+        }
+        /// <summary>
+        /// Porta com maçaneta que leva ao outro lado pela passagem escura. A folha fica na face da parede, virada para a sala
+        /// de onde se usa (+Z local), e não abre. No Quest, segurar a maçaneta; no PC, mirar e clicar.
+        /// </summary>
+        PortaDoAnexo PortaDePassagem(string lado,Vector3 face,float guinada,Vector3 chegada,float guinadaDeChegada)
+        {
+            var raiz=new GameObject("Passagem • "+lado).transform;
+            raiz.SetParent(area,false);
+            raiz.SetPositionAndRotation(face,Quaternion.Euler(0f,guinada,0f));
+            Shape("Porta • "+lado,new Vector3(0,1.05f,.035f),new Vector3(.9f,2.1f,.07f),teal,parent:raiz);
+            foreach(float s in new[]{-1f,1f}) Shape("Batente",new Vector3(s*.5f,1.1f,.04f),new Vector3(.1f,2.2f,.08f),gold,parent:raiz);
+            Shape("Batente",new Vector3(0,2.15f,.04f),new Vector3(1.1f,.1f,.08f),gold,parent:raiz);
+            var knob=Shape("Maçaneta • "+lado,new Vector3(.32f,1f,.12f),new Vector3(.22f,.09f,.17f),gold,parent:raiz);
+            var porta=raiz.gameObject.AddComponent<PortaDoAnexo>();
+            porta.Configurar(passagem,chegada,guinadaDeChegada);
+            var grip=knob.AddComponent<XRSimpleInteractable>();
+            // Solta a maçaneta antes de atravessar: a mão não fica presa a ela do outro lado.
+            grip.selectEntered.AddListener(_=>pending.Add(()=>{
+                if(grip.isSelected) grip.interactionManager.CancelInteractableSelection((IXRSelectInteractable)grip);
+                porta.Usar();
+            }));
+            desktopActions[knob]=()=>porta.Usar();
+            return porta;
         }
         GameObject Shape(string name,Vector3 pos,Vector3 size,Color color,PrimitiveType type=PrimitiveType.Cube,Transform parent=null)
         {
@@ -293,8 +339,9 @@ namespace SebraeLab.Missions
                 fresta.transform.position=PlantaDaTrilha.Frestas[i].center;
                 fresta.size=PlantaDaTrilha.Frestas[i].size;
             }
-            botaoDescompressao=Station("SALA DE DESCOMPRESSÃO",PlantaDaTrilha.BotaoDaDescompressao,()=>Move(PlantaDaTrilha.EntradaDaDescompressao),guinada:180f);
-            botaoDescompressao.SetActive(false);
+            portaDeIda=PortaDePassagem("descompressão",PlantaDaTrilha.PortaDosFundosParaOAnexo,PlantaDaTrilha.GuinadaDaPortaDosFundosParaOAnexo,
+                PlantaDaTrilha.ChegadaNoAnexo,PlantaDaTrilha.GuinadaDeChegadaNoAnexo);
+            Sign("DESCOMPRESSÃO",PlantaDaTrilha.PlacaDaPortaDoAnexo,.09f,PlantaDaTrilha.GuinadaDaPlacaDaPortaDoAnexo);
         }
 
         /// <summary>Fim da trilha: abre a porta de vidro dos fundos e mostra o botão da descompressão.</summary>
@@ -304,14 +351,16 @@ namespace SebraeLab.Missions
             portaDosFundosAberta=true;
             portaDeVidro.Abrir();
             placaDaPorta.text="DESCOMPRESSÃO   •   ENTRADA LIBERADA";
-            botaoDescompressao.SetActive(true);
+            portaDeIda.Liberada=true; portaDeVolta.Liberada=true;
             descompressao.gameObject.SetActive(true); Physics.SyncTransforms();
         }
 
         /// <summary>O que a sinalização precisa saber agora (ver GuiaDaTrilha).</summary>
         public EstadoDaTrilha Estado()
         {
-            var e=new EstadoDaTrilha{Gerente=mission.State,Etapa=etapas.Atual,CafeNaMao=coffeeCollected,PortaDosFundosAberta=portaDosFundosAberta};
+            var cabeca=mission.playerHead.position;
+            var e=new EstadoDaTrilha{Gerente=mission.State,Etapa=etapas.Atual,CafeNaMao=coffeeCollected,PortaDosFundosAberta=portaDosFundosAberta,
+                NoAnexo=PlantaDaTrilha.Anexo.Contains(new Vector3(cabeca.x,PlantaDaTrilha.Anexo.center.y,cabeca.z))};
             if(etapas.Em(EtapaExpediente.Organizacao) && placed<ItemCount)
             {
                 var pendentes=itens[placed/2];
@@ -322,7 +371,7 @@ namespace SebraeLab.Missions
         }
 
         /// <summary>Seta de texto do HUD do PC, vazia quando o feixe está na vista.</summary>
-        public string SetaDoHud()=>feixe && mission.playerHead ? GuiaDaTrilha.SetaDoHud(mission.playerHead.position,mission.playerHead.forward,feixe.transform.position) : "";
+        public string SetaDoHud()=>feixe && feixe.gameObject.activeSelf && mission.playerHead ? GuiaDaTrilha.SetaDoHud(mission.playerHead.position,mission.playerHead.forward,feixe.transform.position) : "";
         readonly List<GameObject>[] destinations={new List<GameObject>(),new List<GameObject>(),new List<GameObject>()};
         string[] jobs={"Guarde os livros na estante","Alinhe as cadeiras nas marcas","Leve os notebooks às mesas"};
         void ShowDeliveryTargets(){
@@ -386,9 +435,9 @@ namespace SebraeLab.Missions
         }
         void BuildLounge()
         {
-            // Montada com as coordenadas de antes (x de 41 a 55), dentro de uma raiz deslocada para trás da parede sul.
+            // Anexo a leste dos fundos: montado com as coordenadas de antes (x de 41 a 55), numa raiz deslocada e sem giro.
             // Shape usa posição local da área; Sign, Station, luminárias e luzes recebem posição no mundo, por L().
-            descompressao=new GameObject("Descompressão (provisória)").transform;
+            descompressao=new GameObject(PlantaDaTrilha.NomeDoAnexo).transform;
             descompressao.position=PlantaDaTrilha.DeslocamentoDaDescompressao;
             var trilha=area; area=descompressao;
             Vector3 L(Vector3 p)=>descompressao.TransformPoint(p);
@@ -460,7 +509,9 @@ namespace SebraeLab.Missions
             Sign("ARCO • segure e puxe a corda\ncom a outra mão\nPC: botão direito dispara",L(new Vector3(51,2,-2)),.073f,guinada);
             // Corda, disparo, física da flecha, anéis e placar ficam no ArcheryRange.
             gameObject.AddComponent<ArcheryRange>().Configurar(hand,visual,()=>ArcadeArrow(visual),target,counter,area);
-            Station("VOLTAR AO PRÉDIO",L(new Vector3(48,1,-6)),()=>Move(PlantaDaTrilha.ChegadaDosFundos),guinada:guinada);
+            portaDeVolta=PortaDePassagem("voltar ao prédio",PlantaDaTrilha.PortaDoAnexoParaOsFundos,PlantaDaTrilha.GuinadaDaPortaDoAnexoParaOsFundos,
+                PlantaDaTrilha.ChegadaDosFundos,PlantaDaTrilha.GuinadaDeChegadaDosFundos);
+            Sign("VOLTAR AO PRÉDIO",PlantaDaTrilha.PlacaDeVoltaNoAnexo,.09f,PlantaDaTrilha.GuinadaDaPlacaDeVolta);
             Station("RECOMEÇAR O DIA",L(new Vector3(50,1,-6)),()=>UnityEngine.SceneManagement.SceneManager.LoadScene(gameObject.scene.name),guinada:guinada);
             area=trilha;
             descompressao.gameObject.SetActive(false); // só aparece quando a porta dos fundos abre

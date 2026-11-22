@@ -246,10 +246,14 @@ namespace SebraeLab.Editor
             yield return null;
             var corredor = new Vector3(2.2f, 0f, -6f);
             var fundos = PlantaDaTrilha.ChegadaDosFundos;
-            var botao = Peca("SALA DE DESCOMPRESSÃO");
+            var ida = PortaDeIda();
             r.Check(!mission.day.PortaDosFundosAberta, "a porta começa trancada");
             r.Check(!Caminho(mission, corredor, fundos, out _), "trancada, não há caminho do corredor aos fundos (frestas fechadas)");
-            r.Check(botao && !botao.activeSelf, "o botão da descompressão começa escondido");
+            r.Check(ida && !ida.Liberada, "a porta do anexo começa travada");
+            var cabecaAntes = mission.playerHead.position;
+            r.Check(ida && !ida.Usar(), "travada, a maçaneta do anexo não faz nada");
+            yield return new WaitForSeconds(Passagem.Tempo * 2f + .2f);
+            r.Check(Distancia2D(mission.playerHead.position, cabecaAntes) < .05f, "travada, a cabeça não sai do lugar");
             var vidro = GameObject.Find(PlantaDaTrilha.NomeDaPortaDeVidro);
             float xAntes = vidro ? Limites(vidro).center.x : float.NaN; // o pivô do FBX fica longe da porta: mede o vidro visível
             mission.day.LiberarDescompressao();
@@ -259,7 +263,7 @@ namespace SebraeLab.Editor
             float xDepois = vidro ? Limites(vidro).center.x : float.NaN;
             r.Check(vidro && Mathf.Abs(xAntes - xDepois - PlantaDaTrilha.CursoDaPortaDeVidro) < .05f, $"a porta de vidro deslizou para oeste (centro de {xAntes:0.##} para {xDepois:0.##})");
             r.Check(Caminho(mission, corredor, fundos, out var d), $"aberta, chega-se aos fundos a pé ({d:0.#} m)");
-            r.Check(botao && botao.activeSelf, "o botão da descompressão aparece");
+            r.Check(ida && ida.Liberada, "a porta do anexo destrava");
             r.Check(AcharPlaca("DESCOMPRESSÃO   •   ENTRADA LIBERADA"), "a placa da porta diz que a entrada foi liberada");
         }
 
@@ -291,7 +295,7 @@ namespace SebraeLab.Editor
                 paradas.Add(($"mesa {i + 1}", PlantaDaTrilha.ChaoDiante(PlantaDaTrilha.DestinoDosNotebooks[i])));
             }
             paradas.Add(("porta dos fundos", PlantaDaTrilha.FeixeDaPortaDosFundos));
-            paradas.Add(("botão da descompressão", PlantaDaTrilha.FeixeDoBotaoDaDescompressao));
+            paradas.Add(("porta do anexo", PlantaDaTrilha.FeixeDaPortaDoAnexo));
             mission.day.LiberarDescompressao();
             yield return new WaitForSeconds(PlantaDaTrilha.TempoDaPortaDeVidro + .3f);
             float total = 0f;
@@ -322,9 +326,9 @@ namespace SebraeLab.Editor
             var solidos = Object.FindObjectsByType<Collider>(FindObjectsSortMode.None)
                 .Where(c => c.enabled && !c.isTrigger && !DaPraca(c) && !PlantaDaTrilha.Predio.Intersects(c.bounds)).ToList();
             r.Check(solidos.Count == 0, $"nenhum colisor fora do prédio além da praça ({solidos.Count}: {string.Join(", ", solidos.Take(5).Select(c => c.name))})");
-            var raiz = AcharObjeto("Descompressão (provisória)");
-            r.Check(raiz && !raiz.gameObject.activeSelf, "a descompressão fica desligada durante a trilha");
-            r.Check(erros == 0, $"nenhum erro no Console com a descompressão desligada ({erros})");
+            var raiz = AcharObjeto(PlantaDaTrilha.NomeDoAnexo);
+            r.Check(raiz && !raiz.gameObject.activeSelf, "o anexo fica desligado durante a trilha");
+            r.Check(erros == 0, $"nenhum erro no Console com o anexo desligado ({erros})");
         }
 
         static IEnumerator Guia(ManagerMission mission, Relatorio r)
@@ -391,32 +395,63 @@ namespace SebraeLab.Editor
 
         static IEnumerator Descompressao(ManagerMission mission, Relatorio r)
         {
-            r.Secao("Descompressão");
+            r.Secao("Anexo da descompressão");
             mission.day.LiberarDescompressao();
             yield return new WaitForSeconds(PlantaDaTrilha.TempoDaPortaDeVidro + .3f);
-            var raiz = GameObject.Find("Descompressão (provisória)");
-            r.Check(raiz, "a descompressão liga quando a porta dos fundos abre");
+            var raiz = GameObject.Find(PlantaDaTrilha.NomeDoAnexo);
+            r.Check(raiz, "o anexo liga quando a porta dos fundos abre");
             if (!raiz) yield break;
-            r.Check(!PlantaDaTrilha.Predio.Intersects(Limites(raiz)), "a descompressão fica fora do prédio, atrás da parede sul");
+            var caixa = Limites(raiz);
+            r.Check(caixa.min.x >= PlantaDaTrilha.FaceLesteDoPredio - .01f && caixa.max.z <= PlantaDaTrilha.InicioDoVidroDaRecepcao,
+                $"o anexo fica do lado de fora, sem invadir os fundos nem o vidro da recepção (x {caixa.min.x:0.##} a {caixa.max.x:0.##}, z {caixa.min.z:0.##} a {caixa.max.z:0.##})");
             var pista = Object.FindFirstObjectByType<BowlingLane>();
-            r.Check(pista && pista.Pista && pista.Pista.transform.IsChildOf(raiz.transform), "a pista de boliche está dentro da descompressão");
+            r.Check(pista && pista.Pista && pista.Pista.transform.IsChildOf(raiz.transform), "a pista de boliche está dentro do anexo");
             var placas = Object.FindObjectsByType<TextMesh>(FindObjectsSortMode.None).Where(t => t.name == "Placa" && t.transform.IsChildOf(raiz.transform)).ToList();
-            r.Check(placas.Count >= 5 && placas.All(t => Mathf.Abs(Mathf.DeltaAngle(t.transform.eulerAngles.y, PlantaDaTrilha.GuinadaDaDescompressao)) < .5f),
-                $"as {placas.Count} placas da descompressão continuam a 90°");
-            var botao = Peca("SALA DE DESCOMPRESSÃO");
-            r.Check(botao && mission.day.UseStation(botao), "o botão da descompressão responde");
+            var volta = placas.FirstOrDefault(t => t.text == "VOLTAR AO PRÉDIO");
+            r.Check(volta && Mathf.Abs(Mathf.DeltaAngle(volta.transform.eulerAngles.y, PlantaDaTrilha.GuinadaDaPlacaDeVolta)) < .5f,
+                "a placa VOLTAR AO PRÉDIO fica sobre a porta, lida por quem olha para oeste");
+            var dasAtividades = placas.Where(t => t != volta).ToList();
+            r.Check(dasAtividades.Count >= 5 && dasAtividades.All(t => Mathf.Abs(Mathf.DeltaAngle(t.transform.eulerAngles.y, PlantaDaTrilha.GuinadaDaDescompressao)) < .5f),
+                $"as {dasAtividades.Count} placas das atividades continuam a 90°");
+            var placaDaPorta = AcharPlaca("DESCOMPRESSÃO");
+            r.Check(placaDaPorta && Mathf.Abs(Mathf.DeltaAngle(placaDaPorta.eulerAngles.y, PlantaDaTrilha.GuinadaDaPlacaDaPortaDoAnexo)) < .5f,
+                "a placa DESCOMPRESSÃO fica sobre a porta dos fundos, lida por quem olha para leste");
+            r.Check(!Peca("SALA DE DESCOMPRESSÃO") && !Peca("VOLTAR AO PRÉDIO"), "os botões antigos de ida e volta saíram");
+            r.Check(Peca("RECOMEÇAR O DIA"), "RECOMEÇAR O DIA continua no anexo");
+
+            var ida = PortaDeIda();
+            var deVolta = PortaDeVolta();
+            var passagem = Object.FindFirstObjectByType<Passagem>();
+            r.Check(ida && deVolta && passagem, "há uma porta de cada lado e uma passagem");
+            if (!ida || !deVolta || !passagem) yield break;
+            var cabeca = mission.playerHead;
+            var feixe = Object.FindFirstObjectByType<Feixe>(FindObjectsInactive.Include);
+
+            r.Check(ida.Usar(), "a maçaneta dos fundos responde");
+            r.Check(!ida.Usar() && !deVolta.Usar(), "um segundo uso durante a passagem é ignorado");
+            yield return new WaitForSeconds(Passagem.Tempo * 2f + .3f);
+            r.Check(NoAnexo(cabeca), $"a porta dos fundos leva para dentro do anexo {Fmt(cabeca.position)}");
+            r.Check(Mathf.Abs(Mathf.DeltaAngle(GuinadaDaCabeca(cabeca), PlantaDaTrilha.GuinadaDeChegadaNoAnexo)) < 10f,
+                $"chega olhando para leste ({GuinadaDaCabeca(cabeca):0}°)");
+            r.Check(!passagem.EmAndamento && passagem.AlfaAtual == 0f && !passagem.Escuro.activeSelf, "a tela clareia e o escuro desliga");
             yield return null;
+            r.Check(feixe && !feixe.gameObject.activeSelf, "dentro do anexo, o feixe se apaga");
+            r.Check(mission.day.SetaDoHud() == "", "dentro do anexo, o HUD do PC fica sem seta");
+
+            r.Check(deVolta.Usar(), "a maçaneta do anexo responde");
+            yield return new WaitForSeconds(Passagem.Tempo * 2f + .3f);
+            r.Check(NosFundos(cabeca), $"a porta do anexo devolve aos fundos {Fmt(cabeca.position)}");
+            r.Check(Mathf.Abs(Mathf.DeltaAngle(GuinadaDaCabeca(cabeca), PlantaDaTrilha.GuinadaDeChegadaDosFundos)) < 10f,
+                $"volta olhando para oeste ({GuinadaDaCabeca(cabeca):0}°)");
+            r.Check(!passagem.EmAndamento && passagem.AlfaAtual == 0f && !passagem.Escuro.activeSelf, "na volta, a tela clareia e o escuro desliga");
             yield return null;
-            r.Check(Distancia2D(mission.playerHead.position, PlantaDaTrilha.EntradaDaDescompressao) < .6f, $"o botão leva à descompressão {Fmt(mission.playerHead.position)}");
-            var voltar = Peca("VOLTAR AO PRÉDIO");
-            r.Check(voltar && mission.day.UseStation(voltar), "o botão Voltar ao prédio responde");
-            yield return null;
-            yield return null;
-            r.Check(Distancia2D(mission.playerHead.position, PlantaDaTrilha.ChegadaDosFundos) < .6f, "Voltar ao prédio leva aos fundos");
-            // A parede oeste é fechada: a pé, não se vai da sala ao gramado (a abertura antiga dava no gramado da praça).
-            var gramado = PlantaDaTrilha.NaDescompressao(new Vector3(39f, 0f, 0f));
-            bool saiu = Caminho(mission, PlantaDaTrilha.EntradaDaDescompressao, gramado, out _);
-            r.Check(!saiu, $"a pé, não se vai da sala de descompressão ao gramado ({(saiu ? "há caminho" : "sem caminho")})");
+            r.Check(feixe && feixe.gameObject.activeSelf, "de volta aos fundos, o feixe acende de novo");
+
+            bool aPe = Caminho(mission, PlantaDaTrilha.ChegadaDosFundos, PlantaDaTrilha.ChegadaNoAnexo, out _);
+            r.Check(!aPe, $"a pé, não se vai dos fundos ao anexo: só pela porta ({(aPe ? "há caminho" : "sem caminho")})");
+            var gramado = PlantaDaTrilha.NaDescompressao(new Vector3(48f, 0f, -10f)); // 2 m ao sul do anexo
+            bool saiu = Caminho(mission, PlantaDaTrilha.ChegadaNoAnexo, gramado, out _);
+            r.Check(!saiu, $"a pé, não se sai do anexo para o gramado ({(saiu ? "há caminho" : "sem caminho")})");
         }
 
         /// <summary>
@@ -900,6 +935,26 @@ namespace SebraeLab.Editor
         static GameObject Peca(string legenda) =>
             Object.FindObjectsByType<MissionButton>(FindObjectsInactive.Include, FindObjectsSortMode.None)
                 .Select(b => b.Peca).FirstOrDefault(p => p && p.name == legenda);
+
+        /// <summary>Porta dos fundos, a que leva para dentro do anexo.</summary>
+        static PortaDoAnexo PortaDeIda() =>
+            Object.FindObjectsByType<PortaDoAnexo>(FindObjectsInactive.Include, FindObjectsSortMode.None)
+                .FirstOrDefault(p => PlantaDaTrilha.Anexo.Contains(p.Chegada + Vector3.up));
+
+        /// <summary>Porta do anexo, a que devolve aos fundos.</summary>
+        static PortaDoAnexo PortaDeVolta() =>
+            Object.FindObjectsByType<PortaDoAnexo>(FindObjectsInactive.Include, FindObjectsSortMode.None)
+                .FirstOrDefault(p => PlantaDaTrilha.Fundos.Contains(p.Chegada + Vector3.up));
+
+        static float GuinadaDaCabeca(Transform cabeca)
+        {
+            var frente = cabeca.forward;
+            frente.y = 0f;
+            return frente.sqrMagnitude < 1e-6f ? cabeca.eulerAngles.y : Quaternion.LookRotation(frente).eulerAngles.y;
+        }
+
+        static bool NoAnexo(Transform cabeca) => PlantaDaTrilha.Anexo.Contains(new Vector3(cabeca.position.x, 1.6f, cabeca.position.z));
+        static bool NosFundos(Transform cabeca) => PlantaDaTrilha.Fundos.Contains(new Vector3(cabeca.position.x, 1.4f, cabeca.position.z));
 
         static Vector3 Chao(Vector3 v) => new Vector3(v.x, 0f, v.z);
         static float Distancia2D(Vector3 a, Vector3 b) => Vector3.Distance(Chao(a), Chao(b));
