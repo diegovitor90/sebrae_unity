@@ -113,6 +113,9 @@ namespace SebraeLab.Editor
             r.Check(face && Mathf.Abs(face.lossyScale.x - 1.4f) < .01f, $"face do alvo com {(face ? face.lossyScale.x : 0f):0.###} m de diâmetro");
             r.Check(a.Texto && a.Texto.text.StartsWith("ARCO ARCADE • 0 pontos"), $"placar inicial: \"{(a.Texto ? a.Texto.text.Replace("\n", " | ") : "")}\"");
             r.Check(a.FlechaCarregada && a.FlechaCarregada.transform.parent == a.Visual, "flecha de luz carregada sobre o arco recurvo");
+            var maos = PegadaDeLonge.MaosDoRig();
+            r.Check(maos.Count > 0 && maos.All(m => PegadaDeLonge.VemParaAMao(a.Arco, m)),
+                $"arco pego pelo raio vem para a mão, e não fica na ponta do raio (rig com {maos.Count} NearFarInteractor)");
         }
 
         static IEnumerator DisparoDoPc(ArcheryRange a, Relatorio r)

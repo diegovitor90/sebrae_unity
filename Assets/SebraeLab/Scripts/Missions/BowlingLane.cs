@@ -2,6 +2,7 @@ using System.Collections.Generic;
 using System.Linq;
 using UnityEngine;
 using UnityEngine.XR.Interaction.Toolkit;
+using UnityEngine.XR.Interaction.Toolkit.Attachment;
 using UnityEngine.XR.Interaction.Toolkit.Inputs.Haptics;
 using UnityEngine.XR.Interaction.Toolkit.Interactables;
 
@@ -103,6 +104,9 @@ namespace SebraeLab.Missions
             CriarTrigger("Fundo da pista", BowlingTrigger.Tipo.Fundo,
                 new Vector3(b.center.x, .4f, b.max.z + 1.1f), new Vector3(largura, 1.2f, 2.8f));
 
+            // O rig pega de longe na ponta do raio. A bola ficaria longe da mão e poderia ser arrastada até os pinos
+            // sem arremesso: pega pelo raio, ela vem para a mão e é lançada por ela.
+            bola.farAttachMode = InteractableFarAttachMode.Near;
             bola.selectEntered.AddListener(AoPegar);
             bola.selectExited.AddListener(AoSoltar);
             AtualizarPlacar();
