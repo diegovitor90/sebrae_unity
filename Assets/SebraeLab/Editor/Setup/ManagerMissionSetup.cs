@@ -22,7 +22,7 @@ namespace SebraeLab.Editor
     {
         const string Root = "Assets/SebraeLab/Missions/Manager";
         public const string MissionScene = "Assets/SebraeLab/Scenes/SebraeLab_MissaoGerente.unity";
-        static readonly Vector3 NpcPosition = new Vector3(2.2f, 0, 6.5f);
+        static readonly Vector3 NpcPosition = PlantaDaTrilha.Gerente;
         static readonly Vector3 RoomPosition = new Vector3(-3, 0, -5);
         static Material blue, skin, dark, white, hair, gold, marker;
         static ManagerMissionSetup() { EditorApplication.delayCall += Auto; }
@@ -128,7 +128,7 @@ namespace SebraeLab.Editor
             Part(quest.transform, "Ponto do gerente", PrimitiveType.Cylinder, NpcPosition + Vector3.up * .008f, new Vector3(.9f, .008f, .9f), marker);
             var name = Panel(quest.transform, "Identificacao do gerente", NpcPosition + Vector3.up * 2.12f, new Vector2(900, 150), -90);
             Text(name.transform, "Nome", "GESTOR DO ESPAÇO", Vector2.zero, new Vector2(870, 130), 40, Color.white);
-            var panel = Panel(quest.transform, "Conversa com o gerente", new Vector3(2.7f, 1.48f, 4.85f), new Vector2(1200, 680), -90);
+            var panel = Panel(quest.transform, "Conversa com o gerente", PlantaDaTrilha.CaixaDeConversa, new Vector2(1200, 680), -90);
             mission.objectiveText = Text(panel.transform, "Objetivo", "MISSÃO 01", new Vector2(0, 235), new Vector2(1120, 100), 33, new Color(.3f, .85f, 1));
             mission.dialogueText = Text(panel.transform, "Dialogo", "Encontre o gestor e converse com ele para receber sua primeira missão.", new Vector2(0, 25), new Vector2(1060, 280), 34, Color.white);
             mission.conversationButton = Button(panel.transform, "Conversar e avancar", new Vector2(0, -190), "CONVERSAR", out var action);
@@ -155,7 +155,7 @@ namespace SebraeLab.Editor
             }
             var simulator = GameObject.Find("Simulador PC - excluido da build"); if (simulator) simulator.SetActive(false);
             Physics.SyncTransforms();
-            var approach = new Vector3(3.4f, 0, 6.7f);
+            var approach = new Vector3(3.95f, 0, 8.1f);
             var startPath = FindPath(rig.transform.position, approach);
             var pathToRoom = FindPath(approach, RoomPosition);
             var route = new GameObject("Marcacoes azuis - caminho ate a sala"); route.transform.SetParent(quest.transform, false); mission.routeMarkers = route;

@@ -63,6 +63,10 @@ namespace SebraeLab.Editor
             r.Texto.AppendLine("Placas • " + DateTime.Now);
             try
             {
+                // A descompressão só liga quando a porta dos fundos abre; sem ela, os placares do boliche e do arco ficam
+                // inativos e nunca ajustam a caixa ao texto.
+                mission.day.LiberarDescompressao();
+                yield return new WaitForSeconds(PlantaDaTrilha.TempoDaPortaDeVidro + .3f);
                 // Passos executados no mesmo iterador: uma exceção chega ao finally e o relatório sai mesmo assim.
                 foreach (var passo in new Func<ManagerMission, Relatorio, IEnumerator>[] { Desenho, Paredes, Parada, Caixa, Mural, DoisLados, OutroLado, Botoes, Memoria })
                 {
@@ -100,9 +104,9 @@ namespace SebraeLab.Editor
             var posicao = jogador.position;
             var rotacao = jogador.rotation;
             if (controle) controle.enabled = false;
-            jogador.SetPositionAndRotation(new Vector3(24f, 0f, 0f), Quaternion.Euler(0f, 90f, 0f));
+            jogador.SetPositionAndRotation(new Vector3(2.2f, 0f, -6f), Quaternion.Euler(0f, 180f, 0f));
             for (int i = 0; i < 10; i++) yield return null;
-            r.Info($"na ala de atividades: {UnityStats.batches} lotes, {UnityStats.drawCalls} chamadas de desenho, {UnityStats.setPassCalls} trocas de material");
+            r.Info($"no corredor sul: {UnityStats.batches} lotes, {UnityStats.drawCalls} chamadas de desenho, {UnityStats.setPassCalls} trocas de material");
             jogador.SetPositionAndRotation(posicao, rotacao);
             if (controle) controle.enabled = true;
             yield return null;
@@ -137,10 +141,10 @@ namespace SebraeLab.Editor
             r.Check(comParede == 0, $"atrás de uma parede, o texto some ({comParede} pixels brancos)");
         }
 
-        static readonly string[] BotoesDaMissao =
+        static readonly (string nome, float guinada)[] BotoesDaMissao =
         {
-            "ENTRAR NA ALA DE ATIVIDADES", "VOLTAR À RECEPÇÃO", "RECOMEÇAR O DIA", "LER O MURAL",
-            "ENTENDIDO", "SALA DE DESCOMPRESSÃO", "REARMAR BOLICHE", "VOLTAR À ALA"
+            ("LER O MURAL", 90f), ("ENTENDIDO", 90f), ("SALA DE DESCOMPRESSÃO", 180f),
+            ("REARMAR BOLICHE", 90f), ("VOLTAR AO PRÉDIO", 90f), ("RECOMEÇAR O DIA", 90f)
         };
 
         static IEnumerator Parada(ManagerMission mission, Relatorio r)
@@ -187,18 +191,17 @@ namespace SebraeLab.Editor
                 $"PRIMEIRO DIA a 270°, lida por quem nasce a leste olhando o gerente ({(primeiroDia ? primeiroDia.eulerAngles.y : float.NaN):0.#}°)");
             r.Check(primeiroDia && Vector3.Dot(primeiroDia.forward, primeiroDia.position - new Vector3(5.7f, 1.62f, 7.1f)) > 0f,
                 "quem nasce na recepção lê PRIMEIRO DIA pela frente");
-            var galeria = placas.FirstOrDefault(t => t.GetComponent<TextMesh>().text.StartsWith("SALA 2"));
-            r.Check(galeria && Mathf.Abs(Mathf.DeltaAngle(galeria.eulerAngles.y, 180f)) < .5f,
-                $"SALA 2 → ALA DE AULAS a 180°, sobre a galeria ({(galeria ? galeria.eulerAngles.y : float.NaN):0.#}°)");
-            r.Check(galeria && Vector3.Dot(galeria.forward, Vector3.back) > .99f,
-                "quem desce a galeria no sentido −Z lê SALA 2 → ALA DE AULAS pela frente");
+            var sala2 = placas.FirstOrDefault(t => t.GetComponent<TextMesh>().text == "SALA 2");
+            r.Check(sala2 && Mathf.Abs(Mathf.DeltaAngle(sala2.eulerAngles.y, 270f)) < .5f,
+                $"SALA 2 a 270°, sobre a porta ({(sala2 ? sala2.eulerAngles.y : float.NaN):0.#}°)");
+            r.Check(sala2 && Vector3.Dot(sala2.forward, Vector3.left) > .99f, "quem está no corredor olhando para oeste lê SALA 2 pela frente");
 
-            foreach (var nome in BotoesDaMissao)
+            foreach (var (nome, guinada) in BotoesDaMissao)
             {
                 // O botão da missão é uma peça (o pai dos Canvas, com o nome da legenda); botão solto usa o próprio Canvas.
                 var botao = botoes.Select(PecaDoBotao).FirstOrDefault(t => t.name == nome);
-                r.Check(botao && Mathf.Abs(Mathf.DeltaAngle(botao.eulerAngles.y, 90f)) < .5f,
-                    $"botão {nome} existe e está a 90° ({(botao ? botao.eulerAngles.y : float.NaN):0.#}°)");
+                r.Check(botao && Mathf.Abs(Mathf.DeltaAngle(botao.eulerAngles.y, guinada)) < .5f,
+                    $"botão {nome} existe e está a {guinada:0}° ({(botao ? botao.eulerAngles.y : float.NaN):0.#}°)");
             }
         }
 
@@ -211,6 +214,7 @@ namespace SebraeLab.Editor
             yield return null;
             var raizes = Object.FindObjectsByType<TextMesh>(FindObjectsInactive.Include, FindObjectsSortMode.None).Where(t => t.name == "Placa").ToList();
             int semCaixa = 0, pequenas = 0, comColisor = 0, outroMaterial = 0;
+            var nomesDasPequenas = new System.Collections.Generic.List<string>();
             foreach (var t in raizes)
             {
                 var corpo = t.transform.Find("Corpo");
@@ -220,7 +224,8 @@ namespace SebraeLab.Editor
                 var medida = MedidaLocal(t);
                 int linhas = Mathf.Max(1, t.text.Split('\n').Length);
                 float margem = .5f * medida.size.y / linhas;
-                if (corpo.localScale.x < medida.size.x + 1.8f * margem || corpo.localScale.y < medida.size.y + 1.8f * margem) pequenas++;
+                if (corpo.localScale.x < medida.size.x + 1.8f * margem || corpo.localScale.y < medida.size.y + 1.8f * margem)
+                { pequenas++; nomesDasPequenas.Add($"\"{t.text.Replace("\n", " / ")}\" ({corpo.localScale.x:0.###}x{corpo.localScale.y:0.###}, texto {medida.size.x:0.###}x{medida.size.y:0.###})"); }
                 if (corpo.GetComponent<Collider>() || moldura.GetComponent<Collider>()) comColisor++;
                 if (!corpo.GetComponent<Renderer>().sharedMaterial.name.StartsWith("PlacaCorpo")
                     || !moldura.GetComponent<Renderer>().sharedMaterial.name.StartsWith("PlacaMoldura")) outroMaterial++;
@@ -231,7 +236,7 @@ namespace SebraeLab.Editor
                 r.Info($"{inativas.Count} placas inativas na hierarquia; menor caixa {comCaixa.Min(c => c.x):0.###} x {comCaixa.Min(c => c.y):0.###} m"
                     + (inativas.Count > 0 ? $"; caixas das inativas: {string.Join(", ", inativas.Select(t => $"{t.transform.Find("Corpo").localScale.x:0.###}x{t.transform.Find("Corpo").localScale.y:0.###}"))}" : ""));
             r.Check(raizes.Count > 0 && semCaixa == 0, $"{raizes.Count - semCaixa} de {raizes.Count} placas com corpo, moldura e verso");
-            r.Check(pequenas == 0, $"a caixa cobre o texto com margem em todas ({pequenas} pequenas demais)");
+            r.Check(pequenas == 0, $"a caixa cobre o texto com margem em todas ({pequenas} pequenas demais{(pequenas > 0 ? ": " + string.Join("; ", nomesDasPequenas) : "")})");
             r.Check(comColisor == 0, $"caixas sem colisor ({comColisor} com colisor)");
             r.Check(outroMaterial == 0, $"corpo PlacaCorpo e moldura PlacaMoldura em todas ({outroMaterial} com outro material)");
         }
@@ -361,14 +366,14 @@ namespace SebraeLab.Editor
             Object.Destroy(paiBloqueado.gameObject);
             yield return null; // Destroy só acontece no fim do quadro: sem esperar, os botões de teste entrariam na contagem
 
-            // Os 8 botões da missão (Station): cada um numa peça com duas faces.
+            // Os 6 botões da missão (Station): cada um numa peça com duas faces.
             var pecasDaMissao = Object.FindObjectsByType<MissionButton>(FindObjectsInactive.Include, FindObjectsSortMode.None)
                 .Select(b => b.GetComponentInParent<Canvas>(true).transform.parent)
                 .Where(p => p && p.Find("Corpo"))
                 .GroupBy(p => p)
                 .ToList();
-            r.Check(pecasDaMissao.Count == 8 && pecasDaMissao.All(g => g.Count() == 2),
-                $"os 8 botões da missão têm duas faces ({pecasDaMissao.Count} peças, {pecasDaMissao.Count(g => g.Count() == 2)} com duas faces)");
+            r.Check(pecasDaMissao.Count == 6 && pecasDaMissao.All(g => g.Count() == 2),
+                $"os 6 botões da missão têm duas faces ({pecasDaMissao.Count} peças, {pecasDaMissao.Count(g => g.Count() == 2)} com duas faces)");
         }
 
         /// <summary>Limite de lixo gerado pelas placas, em bytes por quadro (todas juntas), definido a partir da medição do código antigo.</summary>

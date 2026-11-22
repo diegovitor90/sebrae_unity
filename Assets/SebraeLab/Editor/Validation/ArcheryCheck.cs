@@ -27,7 +27,7 @@ namespace SebraeLab.Editor
         const string ExitKey = "ArcheryCheck.Exit";
         const string PrefixoDasMaos = "Mão de teste (arco)";
         const float LimiteDoVoo = 8f;
-        static readonly Vector3 PosicaoDoArco = new Vector3(51f, 1.5f, -2f);
+        static readonly Vector3 PosicaoDoArco = PlantaDaTrilha.NaDescompressao(new Vector3(51f, 1.5f, -2f));
 
         sealed class Relatorio
         {
@@ -56,6 +56,8 @@ namespace SebraeLab.Editor
             if (!mission || !alcance) return;
             SessionState.SetBool(ExitKey, File.ReadAllText(Request).Trim() == "sair");
             File.Delete(Request);
+            mission.day.LiberarDescompressao(); // a descompressão fica desligada até o fim da trilha
+            Physics.SyncTransforms();
             mission.StartCoroutine(Run(alcance));
         }
 
@@ -158,7 +160,7 @@ namespace SebraeLab.Editor
         static IEnumerator TiroNoChao(ArcheryRange a, Relatorio r)
         {
             r.Secao("Tiro no chão");
-            Mirar(a, PosicaoDoArco, new Vector3(PosicaoDoArco.x, 0f, 0f));
+            Mirar(a, PosicaoDoArco, PlantaDaTrilha.NaDescompressao(new Vector3(51f, 0f, 0f)));
             yield return null;
             int antes = a.Placar.Total, tiros = a.Disparos;
             a.Arco.activated.Invoke(null);

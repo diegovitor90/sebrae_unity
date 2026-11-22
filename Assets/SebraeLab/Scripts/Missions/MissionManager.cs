@@ -151,13 +151,13 @@ namespace SebraeLab.Missions
                 objetivo = "Visite o Mural do Conhecimento.",
                 bloqueio = "Encontre o gerente e entre na Sala 2 antes de ler o mural." },
             new TextosEtapa { etapa = EtapaExpediente.Cafe,
-                objetivo = "Pegue o café na copa e entregue no pires\nda mesa do escritório.",
+                objetivo = "Pegue o café na copa e entregue no pires\nda mesa da Sala 2.",
                 bloqueio = "Leia o Mural do Conhecimento e aperte ENTENDIDO." },
             new TextosEtapa { etapa = EtapaExpediente.Organizacao,
-                objetivo = "Coworking • guarde os livros nas estantes numeradas.",
-                bloqueio = "Entregue o café no pires do escritório antes de organizar o coworking." },
+                objetivo = "Sala de aula • guarde os livros na estante numerada.",
+                bloqueio = "Entregue o café no pires da Sala 2 antes de organizar a sala de aula." },
             new TextosEtapa { etapa = EtapaExpediente.Descompressao,
-                objetivo = "EXPEDIENTE CONCLUÍDO\nEntre na sala de descompressão.",
+                objetivo = "EXPEDIENTE CONCLUÍDO\nA porta dos fundos abriu. Siga a luz até a descompressão.",
                 bloqueio = "A descompressão abre quando os seis itens estiverem no lugar." },
         };
 
