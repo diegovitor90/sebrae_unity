@@ -66,7 +66,7 @@ namespace SebraeLab.Missions
             }
             esmaecer = Mathf.MoveTowards(esmaecer, alvo, VelocidadeDoEsmaecer * Time.deltaTime);
             float pulso = Mathf.Lerp(BrilhoMinimoDoPulso, 1f, .5f + .5f * Mathf.Sin(Time.time * 2f * Mathf.PI / Ciclo));
-            Brilho = alvo < 1f ? esmaecer : pulso * esmaecer;
+            Brilho = pulso * esmaecer;
             bloco.SetFloat(IdDoBrilho, Brilho);
             pintor.SetPropertyBlock(bloco);
         }

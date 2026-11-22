@@ -151,7 +151,7 @@ namespace SebraeLab.Missions
                 objetivo = "Visite o Mural do Conhecimento.",
                 bloqueio = "Encontre o gerente e entre na Sala 2 antes de ler o mural." },
             new TextosEtapa { etapa = EtapaExpediente.Cafe,
-                objetivo = "Pegue o café na copa e entregue no pires\nda mesa do escritório.",
+                objetivo = "Pegue o café na copa e entregue no pires\nda mesa da Sala 2.",
                 bloqueio = "Leia o Mural do Conhecimento e aperte ENTENDIDO." },
             new TextosEtapa { etapa = EtapaExpediente.Organizacao,
                 objetivo = "Sala de aula • guarde os livros na estante numerada.",
