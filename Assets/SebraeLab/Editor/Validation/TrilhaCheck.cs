@@ -413,6 +413,10 @@ namespace SebraeLab.Editor
             yield return null;
             yield return null;
             r.Check(Distancia2D(mission.playerHead.position, PlantaDaTrilha.ChegadaDosFundos) < .6f, "Voltar ao prédio leva aos fundos");
+            // A parede oeste é fechada: a pé, não se vai da sala ao gramado (a abertura antiga dava no gramado da praça).
+            var gramado = PlantaDaTrilha.NaDescompressao(new Vector3(39f, 0f, 0f));
+            bool saiu = Caminho(mission, PlantaDaTrilha.EntradaDaDescompressao, gramado, out _);
+            r.Check(!saiu, $"a pé, não se vai da sala de descompressão ao gramado ({(saiu ? "há caminho" : "sem caminho")})");
         }
 
         /// <summary>

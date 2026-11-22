@@ -195,12 +195,7 @@ namespace SebraeLab.Missions
             }
             floor.AddComponent<TeleportationArea>().interactionLayers=(UnityEngine.XR.Interaction.Toolkit.InteractionLayerMask)(1<<31);
             foreach(int s in new[]{-1,1}){
-                bool passage=s==-1; // passagem na parede oeste, a da entrada
-                if(passage){
-                    float segment=(depth-2.4f)*.5f;
-                    foreach(int end in new[]{-1,1})
-                        Shape("Parede lateral",new Vector3(x+s*width/2,1.6f,end*(1.2f+segment*.5f)),new Vector3(.14f,3.2f,segment),teal);
-                }else Shape("Parede lateral",new Vector3(x+s*width/2,1.6f,0),new Vector3(.14f,3.2f,depth),teal);
+                Shape("Parede lateral",new Vector3(x+s*width/2,1.6f,0),new Vector3(.14f,3.2f,depth),teal);
                 Shape("Parede de fundo",new Vector3(x,1.6f,s*depth/2),new Vector3(width,3.2f,.14f),navy);}
         }
         XRGrabInteractable Grab(GameObject g)
