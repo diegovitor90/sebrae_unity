@@ -143,7 +143,7 @@ namespace SebraeLab.Missions
                 case "Alvo luminoso":
                     var disc=Detail(p,"Face do alvo",Vector3.back*.5f,new Vector3(1f,.001f,1f),"Alvo",PrimitiveType.Cylinder);
                     disc.transform.localRotation=Quaternion.Euler(-90,0,0);finish="Borracha";break;
-                case "Porta • sala do estagiário":
+                case "Porta • sala do estagiário":case "Porta • descompressão":case "Porta • voltar ao prédio":
                     foreach(float side in new[]{-.5f,.5f}){
                         Detail(p,"Almofada inferior",new Vector3(0,-.26f,side),new Vector3(.78f,.33f,.23f),"Nogueira");
                         Detail(p,"Almofada superior",new Vector3(0,.20f,side),new Vector3(.78f,.45f,.23f),"Nogueira");
@@ -157,7 +157,7 @@ namespace SebraeLab.Missions
                 case "Prancha de carvalho":finish="Carvalho";break;
                 case "Batente":finish="Nogueira";break;
                 case "Suporte da bola":case "Suporte do arco":finish="Carvalho";break;
-                case "Maçaneta interna":case "Maçaneta":case "Protótipo":case "Ponta do arco":finish="Aco";break;
+                case "Maçaneta interna":case "Maçaneta":case "Maçaneta • descompressão":case "Maçaneta • voltar ao prédio":case "Protótipo":case "Ponta do arco":finish="Aco";break;
                 case "Parede lateral":finish="Parede";break;
                 case "Parede de fundo":finish="Ripado";break;
                 case "Galeria da praça":case "Piso do escritório":case "Galeria de descompressão":case "Ala de atividades":case "Sala de descompressão":finish="Granilite";break;

@@ -96,17 +96,43 @@ namespace SebraeLab.Missions
             new Bounds(new Vector3(.2f, 1.4f, -8.95f), new Vector3(.9f, 2.8f, .3f)),
         };
         public static readonly Bounds Fundos = new Bounds(new Vector3(-.875f, 1.4f, -11.85f), new Vector3(9.25f, 2.8f, 5.5f));
-        /// <summary>Posição passada ao Station, que soma 0,25 m na altura.</summary>
-        public static readonly Vector3 BotaoDaDescompressao = new Vector3(1.8f, .75f, -11.5f);
-        public static readonly Vector3 ChegadaDosFundos = new Vector3(1.8f, 0f, -10.3f);
+        /// <summary>Onde a porta do anexo devolve a pessoa: 0,85 m para dentro dos fundos, diante da porta.</summary>
+        public static readonly Vector3 ChegadaDosFundos = new Vector3(2.75f, 0f, -12.5f);
+        public const float GuinadaDeChegadaDosFundos = 270f; // olhando para oeste, para a porta de vidro
 
-        // ---------------------------------------------------------------- Descompressão provisória (até a Etapa 3)
-        public static readonly Vector3 DeslocamentoDaDescompressao = new Vector3(-48f, 0f, -26f);
-        /// <summary>Converte uma posição da descompressão antiga (x de 41 a 55) para o lugar novo, atrás da parede sul.</summary>
+        // ---------------------------------------------------------------- Anexo da descompressão (Etapa 3)
+        public const string NomeDoAnexo = "Anexo de descompressão";
+        /// <summary>
+        /// A sala antiga (x de 41 a 55, z de −8 a 8) vai para o leste dos fundos, sem giro: o boliche e o arco atiram
+        /// para +Z, e quem joga fica na metade sul, perto da porta.
+        /// </summary>
+        public static readonly Vector3 DeslocamentoDaDescompressao = new Vector3(-36.65f, 0f, -7.5f);
+        /// <summary>Converte uma posição da sala antiga para o anexo.</summary>
         public static Vector3 NaDescompressao(Vector3 posicaoAntiga) => posicaoAntiga + DeslocamentoDaDescompressao;
-        public static readonly Vector3 EntradaDaDescompressao = NaDescompressao(new Vector3(46f, 0f, 0f));
-        /// <summary>A regra de x = 15 da Etapa 1 mudaria o sentido depois do deslocamento; a descompressão fica com 90°.</summary>
+        /// <summary>
+        /// Sala do anexo no mundo, entre os eixos das paredes: x de 4,35 a 18,35, z de −15,5 a 0,5. As paredes têm 14 cm, e
+        /// as faces internas ficam em x 4,42 e 18,28, z −15,43 e 0,43.
+        /// </summary>
+        public static readonly Bounds Anexo = new Bounds(new Vector3(11.35f, 1.6f, -7.5f), new Vector3(14f, 3.2f, 16f));
+        /// <summary>Face externa da parede leste do prédio, nos fundos. O anexo começa depois dela.</summary>
+        public const float FaceLesteDoPredio = 4.25f;
+        /// <summary>Onde começa o vidro da recepção (Entrada), ao norte do anexo.</summary>
+        public const float InicioDoVidroDaRecepcao = 1.35f;
+        /// <summary>Sem giro, as placas da sala continuam com a mesma guinada.</summary>
         public const float GuinadaDaDescompressao = 90f;
+        /// <summary>Porta na face interna da parede leste dos fundos; a folha fica virada para dentro dos fundos.</summary>
+        public static readonly Vector3 PortaDosFundosParaOAnexo = new Vector3(3.75f, 0f, -12.5f);
+        public const float GuinadaDaPortaDosFundosParaOAnexo = 270f;
+        /// <summary>Porta na face interna da parede oeste do anexo (x local 41,07), frente a frente com a dos fundos.</summary>
+        public static readonly Vector3 PortaDoAnexoParaOsFundos = NaDescompressao(new Vector3(41.07f, 0f, -5f));
+        public const float GuinadaDaPortaDoAnexoParaOsFundos = 90f;
+        /// <summary>1 m para dentro do anexo; em z local −5, longe do botão REARMAR BOLICHE (z local −3).</summary>
+        public static readonly Vector3 ChegadaNoAnexo = NaDescompressao(new Vector3(42.1f, 0f, -5f));
+        public const float GuinadaDeChegadaNoAnexo = 90f; // olhando para leste, para a pista
+        public static readonly Vector3 PlacaDaPortaDoAnexo = new Vector3(3.7f, 2.45f, -12.5f);
+        public const float GuinadaDaPlacaDaPortaDoAnexo = 90f; // lida por quem olha para leste
+        public static readonly Vector3 PlacaDeVoltaNoAnexo = NaDescompressao(new Vector3(41.12f, 2.45f, -5f));
+        public const float GuinadaDaPlacaDeVolta = 270f; // lida por quem olha para oeste
 
         // ---------------------------------------------------------------- Feixe (no chão, onde a pessoa para)
         public static readonly Vector3 FeixeDoGerente = new Vector3(3.95f, 0f, 7.9f); // a 2,1 m do gerente: dentro dos 2,2 m de conversationDistance, diante da mesa
@@ -115,7 +141,7 @@ namespace SebraeLab.Missions
         public static readonly Vector3 FeixeDaBancada = new Vector3(-2.96f, 0f, -1.9f);
         public static readonly Vector3 FeixeDoPires = new Vector3(-2.2f, 0f, -4.75f);
         public static readonly Vector3 FeixeDaPortaDosFundos = new Vector3(1.79f, 0f, -8.3f);
-        public static readonly Vector3 FeixeDoBotaoDaDescompressao = new Vector3(1.8f, 0f, -10.6f);
+        public static readonly Vector3 FeixeDaPortaDoAnexo = new Vector3(2.9f, 0f, -12.5f);
 
         /// <summary>
         /// Onde a pessoa fica para pegar ou entregar algo em <paramref name="ponto"/>. Na sala de aula, é o corredor

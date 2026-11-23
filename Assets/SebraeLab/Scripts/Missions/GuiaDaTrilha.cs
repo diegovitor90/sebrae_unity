@@ -13,6 +13,8 @@ namespace SebraeLab.Missions
         /// <summary>Próximo item da organização a pegar; nulo fora da organização.</summary>
         public Vector3? ProximoItem;
         public bool PortaDosFundosAberta;
+        /// <summary>A cabeça está dentro do anexo: a trilha acabou, e o InternshipDay apaga o feixe e a seta.</summary>
+        public bool NoAnexo;
     }
 
     /// <summary>Regras puras da sinalização: onde fica o feixe e quando a seta aparece. Sem estado; testadas no editor.</summary>
@@ -43,7 +45,7 @@ namespace SebraeLab.Missions
                     if (e.ProximoItem.HasValue) return PlantaDaTrilha.ChaoDiante(e.ProximoItem.Value);
                     return PlantaDaTrilha.FeixeDaPortaDosFundos;
                 default:
-                    return e.PortaDosFundosAberta ? PlantaDaTrilha.FeixeDoBotaoDaDescompressao : PlantaDaTrilha.FeixeDaPortaDosFundos;
+                    return e.PortaDosFundosAberta ? PlantaDaTrilha.FeixeDaPortaDoAnexo : PlantaDaTrilha.FeixeDaPortaDosFundos;
             }
         }
 

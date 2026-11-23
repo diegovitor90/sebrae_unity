@@ -61,9 +61,9 @@ namespace SebraeLab.Missions
                 for(int j=0;j<4;j++) pixels[((y+j)%128)*128+(x+j/2)%128]=new Color32(115,141,78,255);
             }
             grass.SetPixels32(pixels);grass.Apply(true,true);grass.anisoLevel=8;
-            // Leave the recessed bowling gutters free of terrain.
-            foreach(var rect in new[]{new Rect(-90,-85,83,170),new Rect(7,-85,83,170),
-                new Rect(-7,-85,14,51),new Rect(-7,-18,14,103)})
+            // Deixa sem gramado o chão do anexo da descompressão (x de 4,35 a 18,35, z de −15,5 a 0,5), onde ficam as calhas rebaixadas.
+            foreach(var rect in new[]{new Rect(-90,-85,94.35f,170),new Rect(18.35f,-85,71.65f,170),
+                new Rect(4.35f,-85,14,69.5f),new Rect(4.35f,.5f,14,84.5f)})
                 Part("Gramado",new Vector3(rect.center.x,-.19f,rect.center.y),new Vector3(rect.width,.24f,rect.height),Color.white);
             foreach(int side in new[]{-1,1}){
                 Part("Cerca viva",new Vector3(side*89.7f,.5f,0),new Vector3(.6f,1.15f,170),new Color(.2f,.4f,.19f));
