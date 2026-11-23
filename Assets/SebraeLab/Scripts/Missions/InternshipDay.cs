@@ -323,7 +323,7 @@ namespace SebraeLab.Missions
             for(int i=0;i<2;i++) Delivery("Notebook",PlantaDaTrilha.InicioDosNotebooks[i],PlantaDaTrilha.DestinoDosNotebooks[i],new Vector3(.4f,.025f,.28f),Color.gray,2);
         }
 
-        /// <summary>Porta de vidro dos fundos trancada até o fim, frestas fechadas e botão da descompressão escondido.</summary>
+        /// <summary>Porta de vidro dos fundos trancada até o fim, frestas fechadas e porta do anexo montada, ainda trancada.</summary>
         void MontarFundos()
         {
             var vidro=GameObject.Find(PlantaDaTrilha.NomeDaPortaDeVidro);
@@ -344,7 +344,7 @@ namespace SebraeLab.Missions
             Sign("DESCOMPRESSÃO",PlantaDaTrilha.PlacaDaPortaDoAnexo,.09f,PlantaDaTrilha.GuinadaDaPlacaDaPortaDoAnexo);
         }
 
-        /// <summary>Fim da trilha: abre a porta de vidro dos fundos e mostra o botão da descompressão.</summary>
+        /// <summary>Fim da trilha: abre a porta de vidro dos fundos, destranca as duas portas do anexo e liga o anexo.</summary>
         public void LiberarDescompressao()
         {
             if(portaDosFundosAberta)return;

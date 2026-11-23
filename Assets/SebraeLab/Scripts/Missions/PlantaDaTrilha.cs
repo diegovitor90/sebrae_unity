@@ -109,7 +109,10 @@ namespace SebraeLab.Missions
         public static readonly Vector3 DeslocamentoDaDescompressao = new Vector3(-36.65f, 0f, -7.5f);
         /// <summary>Converte uma posição da sala antiga para o anexo.</summary>
         public static Vector3 NaDescompressao(Vector3 posicaoAntiga) => posicaoAntiga + DeslocamentoDaDescompressao;
-        /// <summary>Sala do anexo no mundo, por dentro das paredes: x de 4,35 a 18,35, z de −15,5 a 0,5.</summary>
+        /// <summary>
+        /// Sala do anexo no mundo, entre os eixos das paredes: x de 4,35 a 18,35, z de −15,5 a 0,5. As paredes têm 14 cm, e
+        /// as faces internas ficam em x 4,42 e 18,28, z −15,43 e 0,43.
+        /// </summary>
         public static readonly Bounds Anexo = new Bounds(new Vector3(11.35f, 1.6f, -7.5f), new Vector3(14f, 3.2f, 16f));
         /// <summary>Face externa da parede leste do prédio, nos fundos. O anexo começa depois dela.</summary>
         public const float FaceLesteDoPredio = 4.25f;

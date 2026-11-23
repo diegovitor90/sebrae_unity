@@ -61,15 +61,26 @@ namespace SebraeLab.Missions
 
         IEnumerator Atravessa(Vector3 chegada, float guinada)
         {
-            Escuro.SetActive(true);
-            for (float t = 0f; t < Tempo; t += Time.deltaTime) { Pintar(t / Tempo); yield return null; }
-            Pintar(1f);
-            mover(chegada, guinada);
-            Physics.SyncTransforms();
-            yield return null;
-            for (float t = 0f; t < Tempo; t += Time.deltaTime) { Pintar(1f - t / Tempo); yield return null; }
-            Pintar(0f);
-            Escuro.SetActive(false);
+            try
+            {
+                Escuro.SetActive(true);
+                for (float t = 0f; t < Tempo; t += Time.deltaTime) { Pintar(t / Tempo); yield return null; }
+                Pintar(1f);
+                mover(chegada, guinada);
+                Physics.SyncTransforms();
+                yield return null;
+                for (float t = 0f; t < Tempo; t += Time.deltaTime) { Pintar(1f - t / Tempo); yield return null; }
+            }
+            finally { Soltar(); } // exceção em mover ou corrotina parada: a tela nunca fica escura
+        }
+
+        /// <summary>Desligar o objeto para a corrotina sem passar pelo finally; aqui a tela é solta do mesmo jeito.</summary>
+        void OnDisable() => Soltar();
+
+        void Soltar()
+        {
+            if (pintor) Pintar(0f);
+            if (Escuro) Escuro.SetActive(false);
             EmAndamento = false;
         }
 

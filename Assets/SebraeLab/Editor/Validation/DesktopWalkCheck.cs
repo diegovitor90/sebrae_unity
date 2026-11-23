@@ -88,6 +88,11 @@ internal static class DesktopWalkCheck
         yield return Walk(g.transform.position,2.3f,g);
         pc.UsePointer(true,false);yield return null;yield return null;
     }
+    /// <summary>Espera a passagem escura terminar; se passar de 3 s, falha em vez de seguir com a tela escura.</summary>
+    static IEnumerator EsperarPassagem(){
+        var passagem=UnityEngine.Object.FindFirstObjectByType<Passagem>();Require(passagem,"Passagem ausente");
+        for(float t=0;passagem.EmAndamento;t+=Time.deltaTime){Require(t<3f,"A passagem não terminou em 3 s");yield return null;}
+    }
     static IEnumerator Route(){
         foreach(var sample in new[]{new Vector3(-25,1,0),new Vector3(60,1,6),new Vector3(49,1,-14),new Vector3(47,1,17)}){
             Require(Physics.Raycast(sample,Vector3.down,out var hit,2) && hit.collider.name=="Gramado","Falha no gramado em "+sample);
@@ -133,7 +138,7 @@ internal static class DesktopWalkCheck
         Require(m.day.PortaDosFundosAberta,"A porta dos fundos não abriu no fim da organização");
         yield return new WaitForSeconds(PlantaDaTrilha.TempoDaPortaDeVidro+.3f);
         yield return Click("Maçaneta • descompressão");
-        yield return new WaitForSeconds(Passagem.Tempo*2f+.3f);
+        yield return EsperarPassagem();
         Require(PlantaDaTrilha.Anexo.Contains(Chao(body.transform.position)+Vector3.up),"Sala final");Note("5 OK expediente completo");
         yield return Click("Bola de boliche");
         var ball=GameObject.Find("Bola de boliche").GetComponent<Rigidbody>();
@@ -173,7 +178,7 @@ internal static class DesktopWalkCheck
         Require(ball.position.y<.18f && ball.position.y>-.16f,"Calha "+ball.position);Note("Calha e botão de rearme OK");
         yield return Click("REARMAR BOLICHE");
         yield return Click("Maçaneta • voltar ao prédio");
-        yield return new WaitForSeconds(Passagem.Tempo*2f+.3f);
+        yield return EsperarPassagem();
         Require(PlantaDaTrilha.Fundos.Contains(Chao(body.transform.position)+Vector3.up),"Voltar ao prédio");
         if(File.Exists("Logs/verificar-menu.request")){
             File.Delete("Logs/verificar-menu.request");
@@ -183,7 +188,7 @@ internal static class DesktopWalkCheck
         Require(Vector3.Distance(Chao(body.transform.position),PlantaDaTrilha.Nascimento)<1f,"Voltar à recepção");
         yield return Walk(PlantaDaTrilha.ChegadaDosFundos+Vector3.up*1.62f,.5f);Note("Recepção até os fundos a pé");
         yield return Click("Maçaneta • descompressão");
-        yield return new WaitForSeconds(Passagem.Tempo*2f+.3f);
+        yield return EsperarPassagem();
         Require(PlantaDaTrilha.Anexo.Contains(Chao(body.transform.position)+Vector3.up),"Retorno ao anexo");Note("Retornos aos fundos e à recepção OK");
         SessionState.SetBool("WalkCheck.Restart",true);
         yield return Click("RECOMEÇAR O DIA");

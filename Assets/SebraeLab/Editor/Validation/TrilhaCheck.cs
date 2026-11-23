@@ -447,6 +447,18 @@ namespace SebraeLab.Editor
             yield return null;
             r.Check(feixe && feixe.gameObject.activeSelf, "de volta aos fundos, o feixe acende de novo");
 
+            // Interrompida no meio do escurecimento (objeto desligado), a passagem não pode deixar a tela escura nem travada.
+            r.Check(ida.Usar(), "a maçaneta dos fundos responde de novo");
+            yield return new WaitForSeconds(Passagem.Tempo * .5f);
+            bool escurecia = passagem.EmAndamento && passagem.Escuro.activeSelf;
+            passagem.gameObject.SetActive(false);
+            yield return null;
+            r.Check(escurecia && !passagem.EmAndamento && !passagem.Escuro.activeSelf && passagem.AlfaAtual == 0f,
+                $"desligada no meio, a passagem solta a tela (escurecia {escurecia}, em andamento {passagem.EmAndamento}, escuro {passagem.Escuro.activeSelf}, alfa {passagem.AlfaAtual:0.##})");
+            passagem.gameObject.SetActive(true);
+            yield return null;
+            r.Check(NosFundos(cabeca), $"a passagem interrompida não moveu a pessoa {Fmt(cabeca.position)}");
+
             bool aPe = Caminho(mission, PlantaDaTrilha.ChegadaDosFundos, PlantaDaTrilha.ChegadaNoAnexo, out _);
             r.Check(!aPe, $"a pé, não se vai dos fundos ao anexo: só pela porta ({(aPe ? "há caminho" : "sem caminho")})");
             var gramado = PlantaDaTrilha.NaDescompressao(new Vector3(48f, 0f, -10f)); // 2 m ao sul do anexo
