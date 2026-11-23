@@ -143,8 +143,7 @@ namespace SebraeLab.Editor
 
         static readonly (string nome, float guinada)[] BotoesDaMissao =
         {
-            ("LER O MURAL", 90f), ("ENTENDIDO", 90f), ("SALA DE DESCOMPRESSÃO", 180f),
-            ("REARMAR BOLICHE", 90f), ("VOLTAR AO PRÉDIO", 90f), ("RECOMEÇAR O DIA", 90f)
+            ("LER O MURAL", 90f), ("ENTENDIDO", 90f), ("REARMAR BOLICHE", 90f), ("RECOMEÇAR O DIA", 90f)
         };
 
         static IEnumerator Parada(ManagerMission mission, Relatorio r)
@@ -366,14 +365,14 @@ namespace SebraeLab.Editor
             Object.Destroy(paiBloqueado.gameObject);
             yield return null; // Destroy só acontece no fim do quadro: sem esperar, os botões de teste entrariam na contagem
 
-            // Os 6 botões da missão (Station): cada um numa peça com duas faces.
+            // Os 4 botões da missão (Station): cada um numa peça com duas faces. Ida e volta do anexo são portas.
             var pecasDaMissao = Object.FindObjectsByType<MissionButton>(FindObjectsInactive.Include, FindObjectsSortMode.None)
                 .Select(b => b.GetComponentInParent<Canvas>(true).transform.parent)
                 .Where(p => p && p.Find("Corpo"))
                 .GroupBy(p => p)
                 .ToList();
-            r.Check(pecasDaMissao.Count == 6 && pecasDaMissao.All(g => g.Count() == 2),
-                $"os 6 botões da missão têm duas faces ({pecasDaMissao.Count} peças, {pecasDaMissao.Count(g => g.Count() == 2)} com duas faces)");
+            r.Check(pecasDaMissao.Count == 4 && pecasDaMissao.All(g => g.Count() == 2),
+                $"os 4 botões da missão têm duas faces ({pecasDaMissao.Count} peças, {pecasDaMissao.Count(g => g.Count() == 2)} com duas faces)");
         }
 
         /// <summary>Limite de lixo gerado pelas placas, em bytes por quadro (todas juntas), definido a partir da medição do código antigo.</summary>

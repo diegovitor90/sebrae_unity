@@ -96,8 +96,6 @@ namespace SebraeLab.Missions
             new Bounds(new Vector3(.2f, 1.4f, -8.95f), new Vector3(.9f, 2.8f, .3f)),
         };
         public static readonly Bounds Fundos = new Bounds(new Vector3(-.875f, 1.4f, -11.85f), new Vector3(9.25f, 2.8f, 5.5f));
-        /// <summary>Botão antigo da descompressão. Sai na Tarefa 3 da Etapa 3, depois das verificações antigas.</summary>
-        public static readonly Vector3 BotaoDaDescompressao = new Vector3(1.8f, .75f, -11.5f);
         /// <summary>Onde a porta do anexo devolve a pessoa: 0,85 m para dentro dos fundos, diante da porta.</summary>
         public static readonly Vector3 ChegadaDosFundos = new Vector3(2.75f, 0f, -12.5f);
         public const float GuinadaDeChegadaDosFundos = 270f; // olhando para oeste, para a porta de vidro
@@ -117,8 +115,6 @@ namespace SebraeLab.Missions
         public const float FaceLesteDoPredio = 4.25f;
         /// <summary>Onde começa o vidro da recepção (Entrada), ao norte do anexo.</summary>
         public const float InicioDoVidroDaRecepcao = 1.35f;
-        /// <summary>Antiga entrada da descompressão. Sai na Tarefa 3 da Etapa 3, depois das verificações antigas.</summary>
-        public static readonly Vector3 EntradaDaDescompressao = NaDescompressao(new Vector3(46f, 0f, 0f));
         /// <summary>Sem giro, as placas da sala continuam com a mesma guinada.</summary>
         public const float GuinadaDaDescompressao = 90f;
         /// <summary>Porta na face interna da parede leste dos fundos; a folha fica virada para dentro dos fundos.</summary>
@@ -142,8 +138,6 @@ namespace SebraeLab.Missions
         public static readonly Vector3 FeixeDaBancada = new Vector3(-2.96f, 0f, -1.9f);
         public static readonly Vector3 FeixeDoPires = new Vector3(-2.2f, 0f, -4.75f);
         public static readonly Vector3 FeixeDaPortaDosFundos = new Vector3(1.79f, 0f, -8.3f);
-        /// <summary>Feixe antigo do botão. Sai na Tarefa 3 da Etapa 3, depois das verificações antigas.</summary>
-        public static readonly Vector3 FeixeDoBotaoDaDescompressao = new Vector3(1.8f, 0f, -10.6f);
         public static readonly Vector3 FeixeDaPortaDoAnexo = new Vector3(2.9f, 0f, -12.5f);
 
         /// <summary>

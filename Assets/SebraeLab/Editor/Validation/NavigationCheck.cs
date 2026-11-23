@@ -42,9 +42,8 @@ namespace SebraeLab.Editor
 
         static readonly Vector3[] RotaDaDescompressao =
         {
-            PlantaDaTrilha.EntradaDaDescompressao, PlantaDaTrilha.NaDescompressao(new Vector3(42, 0, -5)),
-            PlantaDaTrilha.NaDescompressao(new Vector3(48, 0, -5)), PlantaDaTrilha.NaDescompressao(new Vector3(48, 0, 0)),
-            PlantaDaTrilha.EntradaDaDescompressao,
+            PlantaDaTrilha.ChegadaNoAnexo, PlantaDaTrilha.NaDescompressao(new Vector3(48, 0, -5)),
+            PlantaDaTrilha.NaDescompressao(new Vector3(48, 0, 0)), PlantaDaTrilha.ChegadaNoAnexo,
         };
 
         static readonly (string nome, Vector3 ponto)[] Ambientes =

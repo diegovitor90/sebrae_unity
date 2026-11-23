@@ -132,9 +132,9 @@ internal static class DesktopWalkCheck
         }
         Require(m.day.PortaDosFundosAberta,"A porta dos fundos não abriu no fim da organização");
         yield return new WaitForSeconds(PlantaDaTrilha.TempoDaPortaDeVidro+.3f);
-        yield return Click("SALA DE DESCOMPRESSÃO");
-        yield return new WaitForSeconds(.2f);
-        Require(Vector3.Distance(Chao(body.transform.position),PlantaDaTrilha.EntradaDaDescompressao)<1.5f,"Sala final");Note("5 OK expediente completo");
+        yield return Click("Maçaneta • descompressão");
+        yield return new WaitForSeconds(Passagem.Tempo*2f+.3f);
+        Require(PlantaDaTrilha.Anexo.Contains(Chao(body.transform.position)+Vector3.up),"Sala final");Note("5 OK expediente completo");
         yield return Click("Bola de boliche");
         var ball=GameObject.Find("Bola de boliche").GetComponent<Rigidbody>();
         Require(!ball.detectCollisions,"Bola não foi pega");
@@ -172,8 +172,9 @@ internal static class DesktopWalkCheck
         yield return new WaitForSeconds(.8f);
         Require(ball.position.y<.18f && ball.position.y>-.16f,"Calha "+ball.position);Note("Calha e botão de rearme OK");
         yield return Click("REARMAR BOLICHE");
-        yield return Click("VOLTAR AO PRÉDIO");
-        Require(PlantaDaTrilha.Fundos.Contains(body.transform.position+Vector3.up),"Voltar ao prédio");
+        yield return Click("Maçaneta • voltar ao prédio");
+        yield return new WaitForSeconds(Passagem.Tempo*2f+.3f);
+        Require(PlantaDaTrilha.Fundos.Contains(Chao(body.transform.position)+Vector3.up),"Voltar ao prédio");
         if(File.Exists("Logs/verificar-menu.request")){
             File.Delete("Logs/verificar-menu.request");
             Cursor.lockState=CursorLockMode.None;
@@ -181,7 +182,9 @@ internal static class DesktopWalkCheck
         }else yield return Walk(PlantaDaTrilha.Nascimento+Vector3.up*1.62f,.5f);
         Require(Vector3.Distance(Chao(body.transform.position),PlantaDaTrilha.Nascimento)<1f,"Voltar à recepção");
         yield return Walk(PlantaDaTrilha.ChegadaDosFundos+Vector3.up*1.62f,.5f);Note("Recepção até os fundos a pé");
-        yield return Click("SALA DE DESCOMPRESSÃO");Note("Retornos aos fundos e à recepção OK");
+        yield return Click("Maçaneta • descompressão");
+        yield return new WaitForSeconds(Passagem.Tempo*2f+.3f);
+        Require(PlantaDaTrilha.Anexo.Contains(Chao(body.transform.position)+Vector3.up),"Retorno ao anexo");Note("Retornos aos fundos e à recepção OK");
         SessionState.SetBool("WalkCheck.Restart",true);
         yield return Click("RECOMEÇAR O DIA");
     }
